@@ -1,0 +1,589 @@
+/*! HTML5 Boilerplate v8.0.0 | MIT License | https://html5boilerplate.com/ */
+
+/* main.css 2.1.0 | MIT License | https://github.com/h5bp/main.css#readme */
+/*
+ * What follows is the result of much research on cross-browser styling.
+ * Credit left inline and big thanks to Nicolas Gallagher, Jonathan Neal,
+ * Kroc Camen, and the H5BP dev community and team.
+ */
+
+/* ==========================================================================
+   Base styles: opinionated defaults
+   ========================================================================== */
+
+html {
+  color: #222;
+  font-size: 1em;
+  line-height: 1.4;
+}
+
+/*
+ * Remove text-shadow in selection highlight:
+ * https://twitter.com/miketaylr/status/12228805301
+ *
+ * Vendor-prefixed and regular ::selection selectors cannot be combined:
+ * https://stackoverflow.com/a/16982510/7133471
+ *
+ * Customize the background color to match your design.
+ */
+
+::-moz-selection {
+  background: #b3d4fc;
+  text-shadow: none;
+}
+
+::selection {
+  background: #b3d4fc;
+  text-shadow: none;
+}
+
+/*
+ * A better looking default horizontal rule
+ */
+
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: 1px solid #ccc;
+  margin: 1em 0;
+  padding: 0;
+}
+
+/*
+ * Remove the gap between audio, canvas, iframes,
+ * images, videos and the bottom of their containers:
+ * https://github.com/h5bp/html5-boilerplate/issues/440
+ */
+
+audio,
+canvas,
+iframe,
+img,
+svg,
+video {
+  vertical-align: middle;
+}
+
+/*
+ * Remove default fieldset styles.
+ */
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * Allow only vertical resizing of textareas.
+ */
+
+textarea {
+  resize: vertical;
+}
+
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+/* ==========================================================================
+   Helper classes
+   ========================================================================== */
+
+/*
+ * Hide visually and from screen readers
+ */
+
+.hidden,
+[hidden] {
+  display: none !important;
+}
+
+/*
+ * Hide only visually, but have it available for screen readers:
+ * https://snook.ca/archives/html_and_css/hiding-content-for-accessibility
+ *
+ * 1. For long content, line feeds are not interpreted as spaces and small width
+ *    causes content to wrap 1 word per line:
+ *    https://medium.com/@jessebeach/beware-smushed-off-screen-accessible-text-5952a4c2cbfe
+ */
+
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+  /* 1 */
+}
+
+/*
+ * Extends the .sr-only class to allow the element
+ * to be focusable when navigated to via the keyboard:
+ * https://www.drupal.org/node/897638
+ */
+
+.sr-only.focusable:active,
+.sr-only.focusable:focus {
+  clip: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  position: static;
+  white-space: inherit;
+  width: auto;
+}
+
+/*
+ * Hide visually and from screen readers, but maintain layout
+ */
+
+.invisible {
+  visibility: hidden;
+}
+
+/*
+ * Clearfix: contain floats
+ *
+ * For modern browsers
+ * 1. The space content is one way to avoid an Opera bug when the
+ *    `contenteditable` attribute is included anywhere else in the document.
+ *    Otherwise it causes space to appear at the top and bottom of elements
+ *    that receive the `clearfix` class.
+ * 2. The use of `table` rather than `block` is only necessary if using
+ *    `:before` to contain the top-margins of child elements.
+ */
+
+.clearfix::before,
+.clearfix::after {
+  content: " ";
+  display: table;
+}
+
+.clearfix::after {
+  clear: both;
+}
+
+/* ==========================================================================
+   EXAMPLE Media Queries for Responsive Design.
+   These examples override the primary ('mobile first') styles.
+   Modify as content requires.
+   ========================================================================== */
+
+@media only screen and (min-width: 35em) {
+  /* Style adjustments for viewports that meet the condition */
+}
+
+@media print,
+  (-webkit-min-device-pixel-ratio: 1.25),
+  (min-resolution: 1.25dppx),
+  (min-resolution: 120dpi) {
+  /* Style adjustments for high resolution devices */
+}
+
+/* ==========================================================================
+   Print styles.
+   Inlined to avoid the additional HTTP request:
+   https://www.phpied.com/delay-loading-your-print-css/
+   ========================================================================== */
+
+@media print {
+  *,
+  *::before,
+  *::after {
+    background: #fff !important;
+    color: #000 !important;
+    /* Black prints faster */
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+
+  abbr[title]::after {
+    content: " (" attr(title) ")";
+  }
+
+  /*
+   * Don't show links that are fragment identifiers,
+   * or use the `javascript:` pseudo protocol
+   */
+  a[href^="#"]::after,
+  a[href^="javascript:"]::after {
+    content: "";
+  }
+
+  pre {
+    white-space: pre-wrap !important;
+  }
+
+  pre,
+  blockquote {
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+
+  /*
+   * Printing Tables:
+   * https://web.archive.org/web/20180815150934/http://css-discuss.incutio.com/wiki/Printing_Tables
+   */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid;
+  }
+
+  p,
+  h2,
+  h3 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+}
+
+html,
+body {
+  scroll-behavior: smooth;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background-color: #F2F0F0;
+  font-family: "Ubuntu", sans-serif;
+}
+
+div.file-dragged-over {
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.75);
+}
+
+.uploadFile {
+  /*
+  Center Div Vertically and Horizontally
+   */
+  width: 45em;
+  height: 25em;
+  padding: 10px;
+  background-color: #F2F0F0;
+  border-radius: 10px;
+  border: #0A0000 dashed 2px;
+  stroke-linejoin: round;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  transition-duration: 0.2s;
+}
+
+.invisible {
+  display: none;
+}
+
+label.file {
+  padding: 0.85em 1.7em 0.85em 1.7em;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  font-size: 2em;
+  font-weight: bold;
+
+  background-color: #0A0000;
+  color: #F2F0F0;
+}
+
+label.file:hover {
+  padding: 1em 2em 1em 2em;
+}
+
+span.file {
+  text-shadow: -2px 2px 4px rgba(0, 0, 0, 0.25);
+  font-size: 3em;
+  font-weight: bold;
+
+  width: 8em;
+  text-align: center;
+}
+
+p.file {
+  font-size: 1em;
+  font-weight: lighter;
+
+  text-shadow: -1px 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.container {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 48em;
+}
+
+#hades2_label {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #0A0000;
+}
+
+div.save-edit {
+  width: 90%;
+  height: 48em;
+
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  border: #0A0000 dashed 2px;
+  stroke-linejoin: round;
+}
+
+.download-container {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  height: 25em;
+  flex-direction: column;
+}
+
+label.download {
+  padding: 0.85em 1.7em 0.85em 1.7em;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  font-size: 2em;
+  font-weight: bold;
+
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+
+  text-align: center;
+
+  background-color: #0A0000;
+  color: #F2F0F0;
+}
+
+label.download:hover {
+  padding: 1em 2em 1em 2em;
+}
+
+.floating-button {
+  position: fixed;
+  bottom: 1em;
+  right: 1em;
+  z-index: 100;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.floating-button__icon {
+  width: 3em;
+  height: 3em;
+
+  border-radius: 100%;
+
+  background-color: #0A0000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.floating-button__text {
+  text-align: center;
+  font-size: 0.6em;
+  font-weight: bolder;
+}
+
+.save-edit__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-content: center;
+  padding: 1em;
+
+  border-radius: 3px;
+  border-bottom: #0A0000 dashed 2px;
+  stroke-linejoin: round;
+}
+
+.save-edit__tab {
+  text-align: center;
+  border: solid #0A0000 1px;
+  margin: 1px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 6em;
+  height: 3em;
+  padding: 0.4em 0.8em 0.4em 0.8em;
+  color: #0A0000;
+
+  font-size: 1.3em;
+  font-weight: bold;
+
+  transition: all 0.1s ease;
+}
+
+.save-edit__content {
+  display: none;
+  max-height: 90%;
+  max-width: 100%;
+  overflow-y: hidden;
+  overflow-x: scroll;
+  flex-flow: row wrap;
+  justify-content: center;
+
+  padding: 1rem;
+}
+
+.active {
+  display: flex;
+}
+
+.selected {
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+span.inputs {
+  display: flex;
+  flex-direction: column;
+}
+
+span.row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+span.save-edit__content {
+  padding: 1em 1em 0 1em;
+  text-align: center;
+  width: 23em;
+}
+
+.save-edit__content.active {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.save-edit__content label {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 1em;
+}
+
+.save-edit__content input {
+  padding: 0.2em;
+  margin-left: 0.6em;
+  margin-bottom: 1em;
+  max-width: 10rem;
+  text-align: center;
+  font-weight: bolder;
+  color: #0A0000;
+
+  border: none;
+  border-bottom: #0A0000 solid 2px;
+  background-color: #F2F0F0;
+}
+
+.save-edit__content input:focus {
+  outline: none;
+  box-shadow: #0A0000 0 0 4px;
+}
+
+label[for="file-download-name"] {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+span.download {
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+input#file-download-name {
+  padding: 0.2em;
+  margin-left: 0.6em;
+  width: auto;
+  text-align: center;
+  font-weight: bolder;
+  color: #0A0000;
+
+  border: none;
+  border-bottom: #0A0000 solid 2px;
+  background-color: #F2F0F0;
+}
+
+label.download.disabled {
+  background-color: #F2F0F0;
+  color: #0A0000;
+  cursor: not-allowed;
+}
+
+#pre-select-content {
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+
+  height: 70%;
+}
+
+#pre-select-content span {
+  font-size: 2rem;
+}
+
+.save-edit__list {
+  display: flex;
+  flex-direction: column;
+
+  margin-bottom: 1em;
+
+  border: black solid 1px;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+
+.feedback-text {
+  text-align: center;
+}
+
+#buymeacoffee {
+  margin-bottom: 1rem;
+}
+
+input[type='checkbox'] {
+  width:30px;
+  height:30px;
+  background:white;
+  border-radius:5px;
+  border:2px solid #555;
+}

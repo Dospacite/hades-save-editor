@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>Hades Save Editor - Now Supports Hades 2!</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta property="og:title" content="">
+  <meta property="og:type" content="">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="">
+
+  <link rel="manifest" href="../site.webmanifest">
+  <link rel="apple-touch-icon" href="../icon.png">
+  <!-- Place favicon.ico in the root directory -->
+
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/main.css">
+
+  <meta name="theme-color" content="#fafafa">
+</head>
+
+<body>
+  <!-- Floating Button That Sends User to the Download Button -->
+  <div class="floating-button">
+    <div class="floating-button__icon">
+      <a href="#file-download">
+        <svg width="2em" height="2em" viewBox="0 0 89 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M40.2574 97.2454C42.6005 99.5885 46.3995 99.5885 48.7426 97.2454L86.9264 59.0616C89.2696 56.7185 89.2696 52.9195 86.9264 50.5763C84.5833 48.2332 80.7843 48.2332 78.4411 50.5763L44.5 84.5175L10.5589 50.5763C8.21572 48.2332 4.41673 48.2332 2.07359 50.5763C-0.269562 52.9195 -0.269562 56.7185 2.07359 59.0616L40.2574 97.2454ZM38.5 0.997314L38.5 93.0028L50.5 93.0028L50.5 0.997315L38.5 0.997314Z" fill="#F2F0F0"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- File Drag and Drop Zone -->
+  <div class="container">
+    <!-- Checkbox to Specify if Hades 1 or Hades 2 -->
+    <div class="checkbox">
+      <label for="hades2" id="hades2_label">Check for Hades 2 -></label>
+      <input type="checkbox" id="hades2" name="hades2">
+    </div>
+    <div class="uploadFile" id="file-upload">
+      <span class="file" id="file">Drag Your<br>Save File Here</span>
+      <p class="file">or</p>
+      <label id="file-submit-button" class="button file" for="file-selector">Select a File</label>
+      <input type="file" id="file-selector" class="input file invisible" accept=".sav">
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Save Editing Part -->
+    <div class="save-edit" id="save-edit">
+      <div class="save-edit__tabs">
+        <div class="save-edit__tab hidden" data-tab="bossDrops">
+          Boss Drops
+        </div>
+        <div class="save-edit__tab hidden" data-tab="resources">
+          Resources
+        </div>
+        <div class="save-edit__tab hidden" data-tab="plants">
+          Plants
+        </div>
+        <div class="save-edit__tab hidden" data-tab="gifts">
+          Gifts
+        </div>
+        <div class="save-edit__tab hidden" data-tab="fishery">
+          Fishery
+        </div>
+        <div class="save-edit__tab hidden" data-tab="gifting">
+          Gifting
+        </div>
+        <div class="save-edit__tab hidden" data-tab="items">
+          Items
+        </div>
+        <div class="save-edit__tab hidden" data-tab="general">
+          General
+        </div>
+        <div class="save-edit__tab hidden" data-tab="currentRun">
+          Current Run
+        </div>
+        <div class="save-edit__tab hidden" data-tab="keepsakes">
+          Keepsakes
+        </div>
+        <div class="save-edit__tab hidden" data-tab="arcanaCards">
+          Arcana Cards
+        </div>
+      </div>
+      <div id="pre-select-content">
+        <span>Upload a File to Edit</span>
+      </div>
+      <div class="save-edit__content" id="gifting"></div>
+      <div class="save-edit__content" id="items"></div>
+      <div class="save-edit__content" id="general"></div>
+      <div class="save-edit__content" id="currentRun"></div>
+      <div class="save-edit__content" id="keepsakes"></div>
+      <div class="save-edit__content" id="arcanaCards">Don't set Level to 0 if its not already 0.</div>
+      <div class="save-edit__content" id="bossDrops"></div>
+      <div class="save-edit__content active" id="resources"></div>
+      <div class="save-edit__content" id="plants"></div>
+      <div class="save-edit__content" id="gifts"></div>
+      <div class="save-edit__content" id="fishery"></div>
+    </div>
+  </div>
+
+  <div class="download-container">
+    <span class="download">
+      <label for="file-download-name">File Name: </label>
+      <input id="file-download-name" class="download" value="Profile2.sav">
+    </span>
+    <label id="file-download" class="button download disabled">Upload First</label>
+  </div>
+
+  <div class="container feedback-text">
+    <span>Are you looking to edit a value that's not available? Write me a feedback at dospacite@protonmail.com</span>
+    <span>With hadessaveeditor.app, you can cheat to edit your Hades save files or Hades 2 save files. Simply drag in your save file or click the button to select your Hades save file.</span>
+    <br>
+    <span>If you want to edit a value absolutely now and know what you're doing,
+      <br>go to the developer console and freely edit the save file by editing the saveData variable.</span>
+  </div>
+
+  <script src="js/vendor/modernizr-3.11.2.min.js"></script>
+  <script src="js/plugins.js"></script>
+  <!-- Path to LZ4 -->
+  <script src="js/adler32.js"></script>
+  <script type="text/javascript" src="js/lz4.js"></script>
+  <script src="js/Struct.js"></script>
+  <script type="text/javascript" src="js/main.js"></script>
+</body>
+
+</html>

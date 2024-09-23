@@ -1,0 +1,74 @@
+{
+    "fields": [
+        {
+            "label": "signature",
+            "type": "padding",
+            "size": 4
+        },
+        {
+            "label": "checksum",
+            "type": "padding",
+            "size": 4
+        },
+        {
+            "label": "save_data",
+            "type": "struct",
+            "fields": [
+                {
+                    "label": "version",
+                    "type": "int32"
+                },
+                {
+                    "label": "timestamp",
+                    "type": "int64"
+                },
+                {
+                    "label": "location",
+                    "type": "string"
+                },
+                {
+                    "label": "runs",
+                    "type": "int32"
+                },
+                {
+                    "label": "active_meta_points",
+                    "type": "int32"
+                },
+                {
+                    "label": "active_shrine_points",
+                    "type": "int32"
+                },
+                {
+                    "label": "god_mode_enabled",
+                    "type": "int8"
+                },
+                {
+                    "label": "hell_mode_enabled",
+                    "type": "int8"
+                },
+                {
+                    "label": "lua_keys",
+                    "type": "array",
+                    "content": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "label": "current_map_name",
+                    "type": "string"
+                },
+                {
+                    "label": "start_next_map",
+                    "type": "string"
+                },
+                {
+                    "label": "luabin",
+                    "type": "array",
+                    "content": {
+                        "type": "int8"
+                    }
+                }
+            ]
+        }
+    ]
+}
