@@ -771,7 +771,15 @@ fields_2 = {
     {
       "label": "Golden Apple",
       "location": "save_data.luabin.0.GameState.Resources.MixerOBoss"
-    }
+    },
+    {
+      "label": "Feather",
+      "location": "save_data.luabin.0.GameState.Resources.MixerPBoss"
+    },
+    {
+      "label": "Void Lens",
+      "location": "save_data.luabin.0.GameState.Resources.MixerQBoss"
+    },
   ],
   "plants": [
     {
@@ -781,6 +789,22 @@ fields_2 = {
     {
       "label": "Mandrake",
       "location": "save_data.luabin.0.GameState.Resources.PlantOMandrake"
+    },
+    {
+      "label": "Olive",
+      "location": "save_data.luabin.0.GameState.Resources.PlantPOlive"
+    },
+    {
+      "label": "Iris",
+      "location": "save_data.luabin.0.GameState.Resources.PlantPIris"
+    },
+    {
+      "label": "Snake-reed",
+      "location": "save_data.luabin.0.GameState.Resources.PlantQSnakereed"
+    },
+    {
+      "label": "Fang",
+      "location": "save_data.luabin.0.GameState.Resources.PlantQFang"
     },
     {
       "label": "Thalamus",
@@ -851,7 +875,11 @@ fields_2 = {
     {
       "label": "Witch's Delights",
       "location": "save_data.luabin.0.GameState.Resources.FamiliarPoints"
-    }
+    },
+    {
+      "label": "Dream Vapors",
+      "location": "save_data.luabin.0.GameState.Resources.HypnosPoints"
+    },
   ],
   "resources": [
     {
@@ -927,6 +955,14 @@ fields_2 = {
       "location": "save_data.luabin.0.GameState.Resources.OreOIron"
     },
     {
+      "label": "Adamant",
+      "location": "save_data.luabin.0.GameState.Resources.OrePAdamant"
+    },
+    {
+      "label": "Scales",
+      "location": "save_data.luabin.0.GameState.Resources.OreQScales"
+    },
+    {
       "label": "Rubbish",
       "location": "save_data.luabin.0.GameState.Resources.TrashPoints"
     },
@@ -949,7 +985,7 @@ fields_2 = {
       "location": "save_data.luabin.0.GameState.Resources.FishGCommon"
     },
     {
-      "label": "Gutternose",
+      "label": "Gutterpop",
       "location": "save_data.luabin.0.GameState.Resources.FishGRare"
     },
     {
@@ -981,19 +1017,19 @@ fields_2 = {
       "location": "save_data.luabin.0.GameState.Resources.FishILegendary"
     },
     {
-      "label": "Roach",
+      "label": "Ribeye",
       "location": "save_data.luabin.0.GameState.Resources.FishNCommon"
     },
     {
-      "label": "Spike",
+      "label": "Zeel",
       "location": "save_data.luabin.0.GameState.Resources.FishNRare"
     },
     {
-      "label": "Zeel",
+      "label": "Neckbiter",
       "location": "save_data.luabin.0.GameState.Resources.FishNLegendary"
     },
     {
-      "label": "Squid",
+      "label": "Shrimp",
       "location": "save_data.luabin.0.GameState.Resources.FishOCommon"
     },
     {
@@ -1001,20 +1037,32 @@ fields_2 = {
       "location": "save_data.luabin.0.GameState.Resources.FishORare"
     },
     {
-      "label": "Tuna",
+      "label": "Squid",
       "location": "save_data.luabin.0.GameState.Resources.FishOLegendary"
     },
     {
-      "label": "Starfish",
+      "label": "Pillartop",
       "location": "save_data.luabin.0.GameState.Resources.FishPCommon"
     },
     {
-      "label": "Discus",
+      "label": "Chrestle",
       "location": "save_data.luabin.0.GameState.Resources.FishPRare"
     },
     {
-      "label": "Godray",
+      "label": "Starsailor",
       "location": "save_data.luabin.0.GameState.Resources.FishPLegendary"
+    },
+    {
+      "label": "Lamprey",
+      "location": "save_data.luabin.0.GameState.Resources.FishQCommon"
+    },
+    {
+      "label": "Stormgullet",
+      "location": "save_data.luabin.0.GameState.Resources.FishQRare"
+    },
+    {
+      "label": "Chimaerid",
+      "location": "save_data.luabin.0.GameState.Resources.FishQLegendary"
     },
     {
       "label": "Slavug",
