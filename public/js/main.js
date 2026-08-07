@@ -1,1252 +1,925 @@
-structData = {
-  "fields": [
-    {
-      "label": "signature",
-      "type": "padding",
-      "size": 4
-    },
-    {
-      "label": "checksum",
-      "type": "padding",
-      "size": 4
-    },
-    {
-      "label": "save_data",
-      "type": "struct",
-      "fields": [
-        {
-          "label": "version",
-          "type": "int32"
-        },
-        {
-          "label": "timestamp",
-          "type": "int64"
-        },
-        {
-          "label": "location",
-          "type": "string"
-        },
-        {
-          "label": "runs",
-          "type": "int32"
-        },
-        {
-          "label": "active_meta_points",
-          "type": "int32"
-        },
-        {
-          "label": "active_shrine_points",
-          "type": "int32"
-        },
-        {
-          "label": "god_mode_enabled",
-          "type": "int8"
-        },
-        {
-          "label": "hell_mode_enabled",
-          "type": "int8"
-        },
-        {
-          "label": "lua_keys",
-          "type": "array",
-          "content": {
-            "type": "string"
-          }
-        },
-        {
-          "label": "current_map_name",
-          "type": "string"
-        },
-        {
-          "label": "start_next_map",
-          "type": "string"
-        },
-        {
-          "label": "luabin",
-          "type": "array",
-          "content": {
-            "type": "int8"
-          }
-        }
-      ]
+/* global HadesEditorCatalog, HadesEditorSearch, HadesFileAccess, HadesSaveCodec */
+
+(function startEditor(global) {
+  "use strict";
+
+  const SAVE_HEADER_READ_SIZE = 512;
+
+  const state = {
+    document: null,
+    sourceBytes: null,
+    sourceFileName: "Profile1.sav",
+    activeSection: null,
+    changedPaths: new Map(),
+    query: "",
+    directoryHandle: null,
+    fileHandle: null,
+    saveListGeneration: 0,
+    statusTimer: null,
+    dialogTrigger: null,
+  };
+
+  const elements = {
+    uploadView: document.getElementById("upload-view"),
+    editorView: document.getElementById("editor-view"),
+    dropZone: document.getElementById("drop-zone"),
+    chooseFileButton: document.getElementById("choose-save-file"),
+    fileInput: document.getElementById("file-input"),
+    folderInput: document.getElementById("folder-input"),
+    openFolderButton: document.getElementById("open-save-folder"),
+    openFolderLabel: document.getElementById("open-save-folder-label"),
+    changeFolderButton: document.getElementById("change-save-folder"),
+    replaceButton: document.getElementById("replace-file"),
+    fileName: document.getElementById("loaded-file-name"),
+    gameBadge: document.getElementById("game-badge"),
+    saveVersion: document.getElementById("save-version"),
+    runCount: document.getElementById("run-count"),
+    tabList: document.getElementById("section-tabs"),
+    panel: document.getElementById("editor-panel"),
+    panelTitle: document.getElementById("panel-title"),
+    panelCount: document.getElementById("panel-count"),
+    search: document.getElementById("field-search"),
+    clearSearch: document.getElementById("clear-search"),
+    editedCount: document.getElementById("edited-count"),
+    resetButton: document.getElementById("reset-changes"),
+    outputName: document.getElementById("output-name"),
+    downloadButton: document.getElementById("download-save"),
+    status: document.getElementById("app-status"),
+    uploadError: document.getElementById("upload-error"),
+    saveFileBrowser: document.getElementById("save-file-browser"),
+    saveFolderName: document.getElementById("save-folder-name"),
+    saveFileList: document.getElementById("save-file-list"),
+    saveFileEmpty: document.getElementById("save-file-empty"),
+    openChangesButton: document.getElementById("open-changes"),
+    changesDialog: document.getElementById("changes-dialog"),
+    closeChangesButton: document.getElementById("close-changes"),
+    openSaveLocationsButton: document.getElementById("open-save-locations"),
+    saveLocationsDialog: document.getElementById("save-locations-dialog"),
+    closeSaveLocationsButton: document.getElementById("close-save-locations"),
+  };
+
+  function getAtPath(root, path) {
+    return path.split(".").reduce(
+      (value, key) => (value == null ? undefined : value[key]),
+      root,
+    );
+  }
+
+  function setAtPath(root, path, value) {
+    const parts = path.split(".");
+    let target = root;
+    parts.forEach((key, index) => {
+      if (index === parts.length - 1) {
+        target[key] = value;
+        return;
+      }
+      if (target[key] == null || typeof target[key] !== "object") {
+        target[key] = Object.create(null);
+      }
+      target = target[key];
+    });
+  }
+
+  function valuesMatch(left, right) {
+    return Object.is(left, right);
+  }
+
+  function recordChange(path, value) {
+    if (!state.changedPaths.has(path)) {
+      state.changedPaths.set(path, getAtPath(state.document, path));
     }
-  ]
-}
-
-structData_2 = {
-  "fields": [
-    {
-      "label": "signature",
-      "type": "padding",
-      "size": 4
-    },
-    {
-      "label": "checksum",
-      "type": "padding",
-      "size": 4
-    },
-    {
-      "label": "save_data",
-      "type": "struct",
-      "fields": [
-        {
-          "label": "version",
-          "type": "int32"
-        },
-        {
-          "label": "timestamp",
-          "type": "int64"
-        },
-        {
-          "label": "location",
-          "type": "string"
-        },
-        {
-          "label": "padding1",
-          "type": "padding",
-          "size": 12
-        },
-        {
-          "label": "runs",
-          "type": "int32"
-        },
-        {
-          "label": "god_mode_enabled",
-          "type": "int8"
-        },
-        {
-          "label": "hell_mode_enabled",
-          "type": "int8"
-        },
-        {
-          "label": "lua_keys",
-          "type": "array",
-          "content": {
-            "type": "string"
-          }
-        },
-        {
-          "label": "current_map_name",
-          "type": "string"
-        },
-        {
-          "label": "start_next_map",
-          "type": "string"
-        },
-        {
-          "label": "luabin",
-          "type": "array",
-          "content": {
-            "type": "int8"
-          }
-        }
-      ]
+    const original = state.changedPaths.get(path);
+    setAtPath(state.document, path, value);
+    if (valuesMatch(original, value)) {
+      state.changedPaths.delete(path);
     }
-  ]
-}
+  }
 
-let saveData = null;
+  function applyEffects(field, value) {
+    (field.effects || []).forEach((effect) => {
+      if (effect.when === "truthy" && !value) return;
+      recordChange(effect.path, effect.value);
+    });
+  }
 
-const fileSelector = document.getElementById("file-selector");
-const fileDownload = document.getElementById("file-download");
-const preSelectContent = document.getElementById("pre-select-content");
-const saveEdit = document.getElementById("save-edit");
-const fileUpload = document.getElementById("file-upload");
-const isHadesTwo = document.getElementById("hades2");
+  function createElement(tag, className, text) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+  }
 
-fileUpload.ondrop = function (event) {
-  event.preventDefault();
+  function formatKey(value) {
+    if (/^\d+(\.\d+)?$/.test(value)) return value;
+    return value
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .replace(/^./, (character) => character.toUpperCase());
+  }
 
-  event.target.files = event.dataTransfer.files;
-  loadFile(event);
-}
+  function getCatalog() {
+    if (!state.document) return null;
+    const catalog = HadesEditorCatalog[state.document.game];
+    if (HadesFileAccess.isTemporarySaveFileName(state.sourceFileName)) return catalog;
+    return {
+      ...catalog,
+      sections: catalog.sections.filter((section) => section.id !== "current-run"),
+    };
+  }
 
-fileUpload.ondragover = function (event) {
-  event.preventDefault();
-  fileUpload.classList.add("file-dragged-over");
-}
+  function getActiveSection() {
+    return getCatalog().sections.find((section) => section.id === state.activeSection);
+  }
 
-fileUpload.ondragleave = function (event) {
-  event.preventDefault();
-  fileUpload.classList.remove("file-dragged-over");
-}
-
-fileUpload.ondragend = function (event) {
-  fileUpload.classList.remove("file-dragged-over");
-}
-
-fileSelector.onchange = function (event) {
-  loadFile(event);
-}
-
-function loadFile(event) {
-  const reader = new FileReader();
-  reader.addEventListener("load", (event) => readFile(event));
-  reader.readAsArrayBuffer(event.target.files[0]);
-}
-
-function readFile(event) {
-  let dataUsed = isHadesTwo.checked ? structData_2 : structData;
-  let buffer = Buffer.from(event.target.result);
-  let struct = new Struct(dataUsed, buffer);
-  struct.parse();
-
-  saveData = struct.data;
-  applyFields(saveData);
-
-  fileDownload.classList.remove("disabled");
-  fileDownload.textContent = "Download Save File";
-  fileDownload.addEventListener("click", (event) => downloadFile(event));
-
-  preSelectContent.hidden = true;
-  saveEdit.scrollIntoView();
-}
-
-function downloadFile() {
-  let dataUsed = isHadesTwo.checked ? structData_2 : structData;
-  let output = Buffer.alloc(1E7);
-  let outStruct = new Struct(dataUsed, output);
-  outStruct.data = saveData;
-  outStruct.output()
-  output = output.slice(0, outStruct.offset)
-
-  let fileName = document.getElementById("file-download-name").value;
-
-  downloadBlob(output, fileName, "application/octet-stream");
-}
-
-function downloadBlob(data, fileName, mimeType) {
-  let blob, url;
-  blob = new Blob([data], {
-    type: mimeType
-  });
-  url = window.URL.createObjectURL(blob);
-  downloadURL(url, fileName);
-  setTimeout(function() {
-    return window.URL.revokeObjectURL(url);
-  }, 1000);
-};
-
-function downloadURL(data, fileName) {
-  let a;
-  a = document.createElement('a');
-  a.href = data;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.style = 'display: none';
-  a.click();
-  a.remove();
-};
-
-saveEditTabButtons = document.getElementsByClassName("save-edit__tab");
-// For each element, add a click event listener
-for (let i = 0; i < saveEditTabButtons.length; i++) {
-  saveEditTabButtons[i].addEventListener("click", function() {
-    // Get the parent element of the clicked button
-    let parent = this.parentElement;
-    // Get all the children of the parent element
-    let children = parent.children;
-    // For each child, remove the active class
-    for (let j = 0; j < children.length; j++) {
-      // Get Tab Content
-      let tabContent = document.getElementById(children[j].attributes["data-tab"].value);
-      tabContent.classList.remove("active");
-      children[j].classList.remove("selected");
+  function setStatus(message, type = "neutral") {
+    if (state.statusTimer) global.clearTimeout(state.statusTimer);
+    elements.status.textContent = message;
+    elements.status.dataset.type = type;
+    state.statusTimer = null;
+    if (message && type !== "error") {
+      state.statusTimer = global.setTimeout(() => {
+        if (elements.status.textContent === message) elements.status.textContent = "";
+      }, 4500);
     }
-    // Add the active class to the clicked button
-    let tabContent = document.getElementById(this.attributes["data-tab"].value);
-    tabContent.classList.add("active");
-    this.classList.add("selected");
-  });
-}
+  }
 
+  function setUploadError(message = "") {
+    elements.uploadError.textContent = message;
+    elements.uploadError.hidden = !message;
+  }
 
-function change(obj, path, value) {
-  if(typeof value === "string" && !isNaN(value)) value = Number(value);
-  const pathArray = path.split(".");
-  const result = pathArray.reduce((acc, curr, i) => {
-    if (i === pathArray.length - 1) {
-      acc[curr] = value;
+  function openDialog(dialog, initialFocus) {
+    if (dialog.open) return;
+    state.dialogTrigger = document.activeElement;
+    dialog.showModal();
+    initialFocus.focus();
+  }
+
+  function closeDialog(dialog) {
+    if (dialog.open) dialog.close();
+  }
+
+  function connectDialog(openButton, dialog, closeButton) {
+    openButton.addEventListener("click", () => openDialog(dialog, closeButton));
+    closeButton.addEventListener("click", () => closeDialog(dialog));
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) closeDialog(dialog);
+    });
+    dialog.addEventListener("close", () => {
+      if (state.dialogTrigger instanceof HTMLElement) state.dialogTrigger.focus();
+      state.dialogTrigger = null;
+    });
+  }
+
+  function updateChangeSummary() {
+    const count = state.changedPaths.size;
+    elements.editedCount.textContent = count === 1 ? "1 value edited" : `${count} values edited`;
+    elements.resetButton.disabled = count === 0;
+  }
+
+  function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "Unknown size";
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatSaveDate(timestamp) {
+    const date = new Date(Number(timestamp) * 1000);
+    if (!Number.isFinite(date.getTime())) return "Unknown date";
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }
+
+  function formatSaveLocation(location) {
+    if (!location) return "Unknown location";
+    return formatKey(String(location).replace(/^Location_/, ""));
+  }
+
+  async function inspectSaveCandidate(candidate) {
+    try {
+      const bytes = await candidate.file.slice(0, SAVE_HEADER_READ_SIZE).arrayBuffer();
+      return { header: HadesSaveCodec.inspectHeader(bytes) };
+    } catch (error) {
+      return { error };
+    }
+  }
+
+  function createSaveFileListItem(candidate, summary) {
+    const item = createElement("div", "save-file-list__item");
+    item.setAttribute("role", "listitem");
+
+    const button = createElement("button", "save-file-entry");
+    button.type = "button";
+    button.addEventListener("click", () => loadFile(candidate.file));
+
+    const copy = createElement("span", "save-file-entry__copy");
+    const title = createElement("span", "save-file-entry__title");
+    title.append(createElement("strong", "", candidate.file.name));
+    if (HadesFileAccess.isTemporarySaveFileName(candidate.file.name)) {
+      title.append(createElement("span", "save-file-entry__badge", "Active run"));
+    }
+    copy.append(title);
+
+    if (summary.header) {
+      const { game, save_data: saveData } = summary.header;
+      const gameLabel = HadesEditorCatalog[game]?.label || game;
+      const runLabel = saveData.runs === 1 ? "1 run" : `${saveData.runs} runs`;
+      copy.append(
+        createElement(
+          "span",
+          "save-file-entry__meta",
+          `${gameLabel} · ${runLabel} · ${formatSaveLocation(saveData.location)}`,
+        ),
+        createElement(
+          "span",
+          "save-file-entry__meta",
+          `Saved ${formatSaveDate(saveData.timestamp)} · ${formatFileSize(candidate.file.size)}`,
+        ),
+      );
+      button.setAttribute(
+        "aria-label",
+        `Open ${candidate.file.name}, ${gameLabel}, ${runLabel}, saved ${formatSaveDate(saveData.timestamp)}`,
+      );
     } else {
-      acc[curr] = acc[curr] || {};
-    }
-    return acc[curr];
-  }, obj);
-}
-
-
-function resolve(path, obj= self, separator='.') {
-  let properties = Array.isArray(path) ? path : path.split(separator);
-  return properties.reduce((prev, curr) => prev?.[curr], obj);
-}
-
-fields = {
-  "general": [
-    {
-      "label": "Next Seeds",
-      "location": "save_data.luabin.0.NextSeeds"
-    },
-    {
-      "label": "God Mode Enabled",
-      "location": "save_data.god_mode_enabled",
-      "inputType": "checkbox"
-    },
-    {
-      "label": "Hell Mode Enabled",
-      "location": "save_data.hell_mode_enabled",
-      "inputType": "checkbox"
-    }
-  ],
-  "resources": [
-    {
-      "label": "Gemstone",
-      "location": "save_data.luabin.0.GameState.Resources.Gems"
-    },
-    {
-      "label": "Nectar",
-      "location": "save_data.luabin.0.GameState.Resources.GiftPoints"
-    },
-    {
-      "label": "Chthonic Key",
-      "location": "save_data.luabin.0.GameState.Resources.LockKeys"
-    },
-    {
-      "label": "Darkness",
-      "location": "save_data.luabin.0.GameState.Resources.MetaPoints"
-    },
-    {
-      "label": "Diamond",
-      "location": "save_data.luabin.0.GameState.Resources.SuperGems"
-    },
-    {
-      "label": "Ambrosia",
-      "location": "save_data.luabin.0.GameState.Resources.SuperGiftPoints"
-    },
-    {
-      "label": "Titan Blood",
-      "location": "save_data.luabin.0.GameState.Resources.SuperLockKeys"
-    }
-  ],
-  "gifting": [
-    {
-      "label": "Achilles",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Achilles_01.Value"
-    },
-    {
-      "label": "Aphrodite",
-      "location": "save_data.luabin.0.GameState.Gift.AphroditeUpgrade.Value"
-    },
-    {
-      "label": "Ares",
-      "location": "save_data.luabin.0.GameState.Gift.AresUpgrade.Value"
-    },
-    {
-      "label": "Artemis",
-      "location": "save_data.luabin.0.GameState.Gift.ArtemisUpgrade.Value"
-    },
-    {
-      "label": "Athena",
-      "location": "save_data.luabin.0.GameState.Gift.AthenaUpgrade.Value"
-    },
-    {
-      "label": "Bouldy",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Bouldy_01.Value"
-    },
-    {
-      "label": "Cerberus",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Cerberus_01.Value"
-    },
-    {
-      "label": "Charon",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Charon_01.Value"
-    },
-    {
-      "label": "Demeter",
-      "location": "save_data.luabin.0.GameState.Gift.DemeterUpgrade.Value"
-    },
-    {
-      "label": "Dionysus",
-      "location": "save_data.luabin.0.GameState.Gift.DionysusUpgrade.Value"
-    },
-    {
-      "label": "Dusa",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Dusa_01.Value"
-    },
-    {
-      "label": "Eurydice",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Eurydice_01.Value"
-    },
-    {
-      "label": "Megaera",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_FurySister_01.Value"
-    },
-    {
-      "label": "Hades",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Hades_01.Value"
-    },
-    {
-      "label": "Hermes",
-      "location": "save_data.luabin.0.GameState.Gift.HermesUpgrade.Value"
-    },
-    {
-      "label": "Hypnos",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Hypnos_01.Value"
-    },
-    {
-      "label": "Nyx",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Nyx_01.Value"
-    },
-    {
-      "label": "Orpheus",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Orpheus_01.Value"
-    },
-    {
-      "label": "Patroclus",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Patroclus_01.Value"
-    },
-    {
-      "label": "Persephone Home",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Persephone_Home_01.Value"
-    },
-    {
-      "label": "Poseidon",
-      "location": "save_data.luabin.0.GameState.Gift.PoseidonUpgrade.Value"
-    },
-    {
-      "label": "Sisyphus",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Sisyphus_01.Value"
-    },
-    {
-      "label": "Skelly",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Skelly_01.Value"
-    },
-    {
-      "label": "Thanatos",
-      "location": "save_data.luabin.0.GameState.Gift.NPC_Thanatos_01.Value"
-    },
-    {
-      "label": "Zeus",
-      "location": "save_data.luabin.0.GameState.Gift.ZeusUpgrade.Value"
+      copy.append(createElement(
+        "span",
+        "save-file-entry__meta",
+        `Header unavailable · ${formatFileSize(candidate.file.size)}`,
+      ));
+      button.setAttribute("aria-label", `Open ${candidate.file.name}`);
     }
 
-  ]
-}
+    button.append(copy, createElement("span", "save-file-entry__action", "Open"));
+    item.append(button);
+    return item;
+  }
 
-fields_2 = {
-  "general": [
-    {
-      "label": "Easy Mode Level",
-      "location": "save_data.luabin.0.GameState.EasyModeLevel"
+  async function renderSaveFileList(candidates, folderName) {
+    const generation = ++state.saveListGeneration;
+    elements.saveFileBrowser.hidden = false;
+    elements.saveFolderName.textContent = folderName;
+    elements.saveFileEmpty.hidden = true;
+    elements.saveFileList.hidden = false;
+    elements.saveFileList.setAttribute("aria-busy", "true");
+    elements.saveFileList.replaceChildren();
+
+    if (candidates.length === 0) {
+      elements.saveFileList.hidden = true;
+      elements.saveFileEmpty.hidden = false;
+      elements.saveFileList.removeAttribute("aria-busy");
+      return;
     }
-  ],
-  "currentRun": [
-    {
-      "label": "Health",
-      "location": "save_data.luabin.0.GameState.CurrentRun.Health"
-    },
-    {
-      "label": "Money",
-      "location": "save_data.luabin.0.GameState.CurrentRun.Money"
-    },
-    {
-      "label": "Last Stands Used",
-      "location": "save_data.luabin.0.GameState.CurrentRun.LastStandsUsed"
-    },
-    {
-      "label": "Max Last Stands",
-      "location": "save_data.luabin.0.GameState.CurrentRun.MaxLastStands"
-    },
-  ],
-  "arcanaCards": [
-    {
-      "label": "The Sorceress",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.ChanneledCast",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Huntress",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.LowManaDamageBonus",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Titan",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.BonusHealth",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Unseen",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.ManaOverTime",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Furies",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.CastBuff",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Boatman",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.StartingGold",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Swift Runner",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.SprintShield",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Lovers",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.ChanneledBlock",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Wayward Son",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.HealthRegen",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Eternity",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.LastStand",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Moon",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.CastCount",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Messenger",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.BonusDodge",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Centaur",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.MaxHealthPerRoom",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Origination",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.StatusVulnerability",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Death",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.MagicCrit",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Seer",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.TradeOff",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Fates",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.DoorReroll",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Champions",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.ScreenReroll",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Excellence",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.RarityBoost",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Divinity",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.EpicRarityBoost",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Queen",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.BonusRarity",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Judgment",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.CardDraw",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Night",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.SorceryRegenUpgrade",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "Strength",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.LowHealthBonus",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    },
-    {
-      "label": "The Artificer",
-      "location": "save_data.luabin.0.GameState.MetaUpgradeState.MetaToRunUpgrade",
-      "excludedFields": ["AdjacencyBonuses"],
-      "inputType": "dict"
-    }
-  ],
-  "keepsakes": [
-    {
-      "label": "Silver Wheel",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ManaOverTimeRefundKeepsake",
-      "pathTrue": "HecateGift01",
-    },
-    {
-      "label": "Knuckle Bones",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.BossPreDamageKeepsake",
-      "pathTrue": "OdysseusGift01",
 
-    },
-    {
-      "label": "Crystal Figurine",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.BossMetaUpgradeKeepsake",
-      "pathTrue": "CirceGift01",
-    },
-    {
-      "label": "Ghost Onion",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.DoorHealReserveKeepsake",
-      "pathTrue": "DoraGift01",
-    },
-    {
-      "label": "Luckier Tooth",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ReincarnationKeepsake",
-      "pathTrue": "SkellyGift01",
-    },
-    {
-      "label": "Engraved Pin",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.BlockDeathKeepsake",
-      "pathTrue": "MorosGift01",
-    },
-    {
-      "label": "Evil Eye",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.DeathVengeanceKeepsake",
-      "pathTrue": "NemesisGift01",
-    },
-    {
-      "label": "Gold Purse",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.BonusMoneyKeepsake",
-      "pathTrue": "CharonGift01",
-    },
-    {
-      "label": "White Antler",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.LowHealthCritKeepsake",
-      "pathTrue": "ArtemisGift01",
-    },
-    {
-      "label": "Moon Beam",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.SpellTalentKeepsake",
-      "pathTrue": "SeleneGift01",
-    },
-    {
-      "label": "Silken Sash",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ArmorGainKeepsake",
-      "pathTrue": "ArachneGift01",
-    },
-    {
-      "label": "Experimental Hammer",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.TempHammerKeepsake",
-      "pathTrue": "IcarusGift01",
-    },
-    {
-      "label": "Aromatic Phial",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.FountainRarityKeepsake",
-      "pathTrue": "NarcissusGift01",
-    },
-    {
-      "label": "Transcendent Embryo",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.RandomBlessingKeepsake",
-      "pathTrue": "ChaosGift01",
-    },
-    {
-      "label": "Concave Stone",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.UnpickedBoonKeepsake",
-      "pathTrue": "EchoGift01",
-    },
-    {
-      "label": "Cloud Bangl",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceZeusBoonKeepsake",
-      "pathTrue": "ZeusGift01",
-    },
-    {
-      "label": "Iridescent Fan",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceHeraBoonKeepsake",
-      "pathTrue": "HeraGift01",
-    },
-    {
-      "label": "Vivid Sea",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForcePoseidonBoonKeepsake",
-      "pathTrue": "PoseidonGift01",
-    },
-    {
-      "label": "Purest Hope",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceApolloBoonKeepsake",
-      "pathTrue": "ApolloGift01",
-    },
-    {
-      "label": "Barley Sheaf",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceDemeterBoonKeepsake",
-      "pathTrue": "DemeterGift01",
-    },
-    {
-      "label": "Beautiful Mirror",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceAphroditeBoonKeepsake",
-      "pathTrue": "AphroditeGift01",
-    },
-    {
-      "label": "Adamant Shard",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceHephaestusBoonKeepsake",
-      "pathTrue": "HephaestusGift01",
-    },
-    {
-      "label": "Everlasting Ember",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.ForceHestiaBoonKeepsake",
-      "pathTrue": "HestiaGift01",
-    },
-    {
-      "label": "Blackened Fleece",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.DamagedDamageBoostKeepsake",
-      "pathTrue": "MedeaGift01",
-    },
-    {
-      "label": "Lion Fang",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.DecayingBoostKeepsake",
-      "pathTrue": "HeraclesGift01",
-    },
-    {
-      "label": "Discordant Bell",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.EscalatingKeepsake",
-      "pathTrue": "ErisGift01",
-    },
-    {
-      "label": "Metallic Droplet",
-      "location": "save_data.luabin.0.GameState.KeepsakeChambers.TimedBuffKeepsake",
-      "pathTrue": "HermesGift01",
-    },
-  ],
-  "bossDrops":[
-    {
-      "label": "Cinder",
-      "location": "save_data.luabin.0.GameState.Resources.MixerFBoss"
-    },
-    {
-      "label": "Pearl",
-      "location": "save_data.luabin.0.GameState.Resources.MixerGBoss"
-    },
-    {
-      "label": "Tears",
-      "location": "save_data.luabin.0.GameState.Resources.MixerHBoss"
-    },
-    {
-      "label": "Zodiac Sand",
-      "location": "save_data.luabin.0.GameState.Resources.MixerIBoss"
-    },
-    {
-      "label": "Wool",
-      "location": "save_data.luabin.0.GameState.Resources.MixerNBoss"
-    },
-    {
-      "label": "Golden Apple",
-      "location": "save_data.luabin.0.GameState.Resources.MixerOBoss"
-    },
-    {
-      "label": "Feather",
-      "location": "save_data.luabin.0.GameState.Resources.MixerPBoss"
-    },
-    {
-      "label": "Void Lens",
-      "location": "save_data.luabin.0.GameState.Resources.MixerQBoss"
-    },
-  ],
-  "plants": [
-    {
-      "label": "Garlic",
-      "location": "save_data.luabin.0.GameState.Resources.PlantNGarlic"
-    },
-    {
-      "label": "Mandrake",
-      "location": "save_data.luabin.0.GameState.Resources.PlantOMandrake"
-    },
-    {
-      "label": "Olive",
-      "location": "save_data.luabin.0.GameState.Resources.PlantPOlive"
-    },
-    {
-      "label": "Iris",
-      "location": "save_data.luabin.0.GameState.Resources.PlantPIris"
-    },
-    {
-      "label": "Snake-reed",
-      "location": "save_data.luabin.0.GameState.Resources.PlantQSnakereed"
-    },
-    {
-      "label": "Fang",
-      "location": "save_data.luabin.0.GameState.Resources.PlantQFang"
-    },
-    {
-      "label": "Thalamus",
-      "location": "save_data.luabin.0.GameState.Resources.PlantChaosThalamus"
-    },
-    {
-      "label": "Moly",
-      "location": "save_data.luabin.0.GameState.Resources.PlantFMoly"
-    },
-    {
-      "label": "Nightshade",
-      "location": "save_data.luabin.0.GameState.Resources.PlantFNightshade"
-    },
-    {
-      "label": "Cattail",
-      "location": "save_data.luabin.0.GameState.Resources.PlantGCattail"
-    },
-    {
-      "label": "Lotus",
-      "location": "save_data.luabin.0.GameState.Resources.PlantGLotus"
-    },
-    {
-      "label": "Myrtle",
-      "location": "save_data.luabin.0.GameState.Resources.PlantHMyrtle"
-    },
-    {
-      "label": "Wheat",
-      "location": "save_data.luabin.0.GameState.Resources.PlantHWheat"
-    },
-    {
-      "label": "Poppy",
-      "location": "save_data.luabin.0.GameState.Resources.PlantIPoppy"
-    },
-    {
-      "label": "Shaderot",
-      "location": "save_data.luabin.0.GameState.Resources.PlantIShaderot"
-    },
-    {
-      "label": "Deathcap",
-      "location": "save_data.luabin.0.GameState.Resources.PlantMoney"
-    },
-    {
-      "label": "Moss",
-      "location": "save_data.luabin.0.GameState.Resources.PlantNMoss"
-    },
-    {
-      "label": "Driftwood",
-      "location": "save_data.luabin.0.GameState.Resources.PlantODriftwood"
-    }
-  ],
-  "gifts": [
-    {
-      "label": "Nectar",
-      "location": "save_data.luabin.0.GameState.Resources.GiftPoints"
-    },
-    {
-      "label": "Bath Salt",
-      "location": "save_data.luabin.0.GameState.Resources.GiftPointsRare"
-    },
-    {
-      "label": "Twin Lures",
-      "location": "save_data.luabin.0.GameState.Resources.GiftPointsEpic"
-    },
-    {
-      "label": "Ambrosia",
-      "location": "save_data.luabin.0.GameState.Resources.SuperGiftPoints"
-    },
-    {
-      "label": "Witch's Delights",
-      "location": "save_data.luabin.0.GameState.Resources.FamiliarPoints"
-    },
-    {
-      "label": "Dream Vapors",
-      "location": "save_data.luabin.0.GameState.Resources.HypnosPoints"
-    },
-  ],
-  "resources": [
-    {
-      "label": "Moon Dust",
-      "location": "save_data.luabin.0.GameState.Resources.CardUpgradePoints"
-    },
-    {
-      "label": "Obol Points",
-      "location": "save_data.luabin.0.GameState.Resources.CharonPoints"
-    },
-    {
-      "label": "Nightmare",
-      "location": "save_data.luabin.0.GameState.Resources.WeaponPointsRare"
-    },
-    {
-      "label": "Dark",
-      "location": "save_data.luabin.0.GameState.Resources.Mixer6Common"
-    },
-    {
-      "label": "Entropy",
-      "location": "save_data.luabin.0.GameState.Resources.MixerMythic"
-    },
-    {
-      "label": "Psyche",
-      "location": "save_data.luabin.0.GameState.Resources.MemPointsCommon"
-    },
-    {
-      "label": "Star Dust",
-      "location": "save_data.luabin.0.GameState.Resources.Mixer5Common"
-    },
-    {
-      "label": "Ashes",
-      "location": "save_data.luabin.0.GameState.Resources.MetaCardPointsCommon"
-    },
-    {
-      "label": "Bones",
-      "location": "save_data.luabin.0.GameState.Resources.MetaCurrency"
-    },
-    {
-      "label": "Fate Fabric",
-      "location": "save_data.luabin.0.GameState.Resources.MetaFabric"
-    },
-    {
-      "label": "Shadow",
-      "location": "save_data.luabin.0.GameState.Resources.MixerShadow"
-    },
-    {
-      "label": "Plasma",
-      "location": "save_data.luabin.0.GameState.Resources.OreChaosProtoplasm"
-    },
-    {
-      "label": "Silver",
-      "location": "save_data.luabin.0.GameState.Resources.OreFSilver"
-    },
-    {
-      "label": "Limestone",
-      "location": "save_data.luabin.0.GameState.Resources.OreGLime"
-    },
-    {
-      "label": "Glassrock",
-      "location": "save_data.luabin.0.GameState.Resources.OreHGlassrock"
-    },
-    {
-      "label": "Marble",
-      "location": "save_data.luabin.0.GameState.Resources.OreIMarble"
-    },
-    {
-      "label": "Bronze",
-      "location": "save_data.luabin.0.GameState.Resources.OreNBronze"
-    },
-    {
-      "label": "Iron",
-      "location": "save_data.luabin.0.GameState.Resources.OreOIron"
-    },
-    {
-      "label": "Adamant",
-      "location": "save_data.luabin.0.GameState.Resources.OrePAdamant"
-    },
-    {
-      "label": "Scales",
-      "location": "save_data.luabin.0.GameState.Resources.OreQScales"
-    },
-    {
-      "label": "Rubbish",
-      "location": "save_data.luabin.0.GameState.Resources.TrashPoints"
-    },
-  ],
-  "fishery": [
-    {
-      "label": "Moper",
-      "location": "save_data.luabin.0.GameState.Resources.FishFCommon"
-    },
-    {
-      "label": "Figment",
-      "location": "save_data.luabin.0.GameState.Resources.FishFRare"
-    },
-    {
-      "label": "Soulbelly",
-      "location": "save_data.luabin.0.GameState.Resources.FishFLegendary"
-    },
-    {
-      "label": "Chiton",
-      "location": "save_data.luabin.0.GameState.Resources.FishGCommon"
-    },
-    {
-      "label": "Gutterpop",
-      "location": "save_data.luabin.0.GameState.Resources.FishGRare"
-    },
-    {
-      "label": "Stalkfin",
-      "location": "save_data.luabin.0.GameState.Resources.FishGLegendary"
-    },
-    {
-      "label": "Soby",
-      "location": "save_data.luabin.0.GameState.Resources.FishHCommon"
-    },
-    {
-      "label": "Anguish",
-      "location": "save_data.luabin.0.GameState.Resources.FishHRare"
-    },
-    {
-      "label": "Tearjerker",
-      "location": "save_data.luabin.0.GameState.Resources.FishHLegendary"
-    },
-    {
-      "label": "Jiffy",
-      "location": "save_data.luabin.0.GameState.Resources.FishICommon"
-    },
-    {
-      "label": "Goldfish",
-      "location": "save_data.luabin.0.GameState.Resources.FishIRare"
-    },
-    {
-      "label": "Styxeon",
-      "location": "save_data.luabin.0.GameState.Resources.FishILegendary"
-    },
-    {
-      "label": "Ribeye",
-      "location": "save_data.luabin.0.GameState.Resources.FishNCommon"
-    },
-    {
-      "label": "Zeel",
-      "location": "save_data.luabin.0.GameState.Resources.FishNRare"
-    },
-    {
-      "label": "Neckbiter",
-      "location": "save_data.luabin.0.GameState.Resources.FishNLegendary"
-    },
-    {
-      "label": "Shrimp",
-      "location": "save_data.luabin.0.GameState.Resources.FishOCommon"
-    },
-    {
-      "label": "Chrab",
-      "location": "save_data.luabin.0.GameState.Resources.FishORare"
-    },
-    {
-      "label": "Squid",
-      "location": "save_data.luabin.0.GameState.Resources.FishOLegendary"
-    },
-    {
-      "label": "Pillartop",
-      "location": "save_data.luabin.0.GameState.Resources.FishPCommon"
-    },
-    {
-      "label": "Chrestle",
-      "location": "save_data.luabin.0.GameState.Resources.FishPRare"
-    },
-    {
-      "label": "Starsailor",
-      "location": "save_data.luabin.0.GameState.Resources.FishPLegendary"
-    },
-    {
-      "label": "Lamprey",
-      "location": "save_data.luabin.0.GameState.Resources.FishQCommon"
-    },
-    {
-      "label": "Stormgullet",
-      "location": "save_data.luabin.0.GameState.Resources.FishQRare"
-    },
-    {
-      "label": "Chimaerid",
-      "location": "save_data.luabin.0.GameState.Resources.FishQLegendary"
-    },
-    {
-      "label": "Slavug",
-      "location": "save_data.luabin.0.GameState.Resources.FishBCommon"
-    },
-    {
-      "label": "Chrustacean",
-      "location": "save_data.luabin.0.GameState.Resources.FishBRare"
-    },
-    {
-      "label": "Flameater",
-      "location": "save_data.luabin.0.GameState.Resources.FishBLegendary"
-    },
-    {
-      "label": "Mati",
-      "location": "save_data.luabin.0.GameState.Resources.FishChaosCommon"
-    },
-    {
-      "label": "Projelly",
-      "location": "save_data.luabin.0.GameState.Resources.FishChaosRare"
-    },
-    {
-      "label": "Voidskate",
-      "location": "save_data.luabin.0.GameState.Resources.FishChaosLegendary"
-    }
-  ],
-}
+    const summaries = await Promise.all(candidates.map(inspectSaveCandidate));
+    if (generation !== state.saveListGeneration) return;
+    const fragment = document.createDocumentFragment();
+    candidates.forEach((candidate, index) => {
+      fragment.append(createSaveFileListItem(candidate, summaries[index]));
+    });
+    elements.saveFileList.replaceChildren(fragment);
+    elements.saveFileList.removeAttribute("aria-busy");
+  }
 
-function applyFields() {
-  let fieldsToUse = isHadesTwo.checked ? fields_2 : fields;
-  for (const tab in fieldsToUse) {
-    let tabButton = document.querySelector(`[data-tab="${tab}"]`);
-    tabButton.classList.remove("hidden");
-    let tabDiv = document.getElementById(tab);
-    for(let item in fieldsToUse[tab]) {
-      item = fieldsToUse[tab][item];
+  function markEdited(container, path) {
+    container.classList.toggle("is-edited", state.changedPaths.has(path));
+  }
 
-      // Grab Item Value in Save Data
-      let value = resolve(item.location, saveData);
+  function markAnyEdited(container, paths) {
+    container.classList.toggle(
+      "is-edited",
+      paths.some((path) => state.changedPaths.has(path)),
+    );
+  }
 
-      if(value === undefined) { // Create Data
-        change(saveData, item.location, 0);
-        value = 0;
+  function makeMissingNote() {
+    return createElement("span", "field__missing", "Not in save");
+  }
+
+  function makeFieldIcon(field) {
+    if (!field.icon) return null;
+    const icon = createElement("img", "field__icon");
+    icon.src = field.icon;
+    icon.alt = "";
+    icon.width = 70;
+    icon.height = 70;
+    icon.loading = "lazy";
+    icon.decoding = "async";
+    return icon;
+  }
+
+  function renderNumberField(field, id, path = field.path, label = field.label) {
+    const value = getAtPath(state.document, path);
+    const row = createElement("div", "field");
+    row.dataset.search = `${field.label} ${field.group || ""} ${label}`.toLowerCase();
+    markEdited(row, path);
+
+    const labelElement = createElement("label", "field__label");
+    labelElement.htmlFor = id;
+    const labelCopy = createElement("span", "field__label-copy");
+    labelCopy.append(createElement("span", "field__label-text", label));
+    const meta = createElement("span", "field__meta");
+    if (field.suffix) meta.append(createElement("span", "field__suffix", field.suffix));
+    if (value === undefined) meta.append(makeMissingNote());
+    labelCopy.append(meta);
+    const icon = makeFieldIcon(field);
+    labelElement.append(...[icon, labelCopy].filter(Boolean));
+
+    const input = createElement("input", "field__input");
+    input.type = "number";
+    input.id = id;
+    input.inputMode = "decimal";
+    if (field.accessibleLabel) input.setAttribute("aria-label", field.accessibleLabel);
+    input.step = String(field.step ?? "any");
+    if (field.min !== undefined) input.min = String(field.min);
+    if (field.max !== undefined) input.max = String(field.max);
+    if (typeof value === "number" && Number.isFinite(value)) input.value = String(value);
+    input.placeholder = "—";
+
+    input.addEventListener("change", () => {
+      if (input.value.trim() === "") return;
+      const nextValue = Number(input.value);
+      if (!Number.isFinite(nextValue) || !input.checkValidity()) {
+        input.reportValidity();
+        return;
       }
+      recordChange(path, nextValue);
+      applyEffects(field, nextValue);
+      row.querySelector(".field__missing")?.remove();
+      markEdited(row, path);
+      updateChangeSummary();
+    });
 
-      // If Value is of type Object, initiate list generation
-      if(item.inputType === "dict") {
-        let dictElement = applyDictionary(value, item, saveData);
-        tabDiv.appendChild(dictElement);
-        continue;
+    row.append(labelElement, input);
+    return row;
+  }
+
+  function renderToggleField(field, id) {
+    const value = getAtPath(state.document, field.path);
+    const label = createElement("label", "toggle-field");
+    label.htmlFor = id;
+    label.dataset.search = `${field.label} ${field.group || ""}`.toLowerCase();
+    markEdited(label, field.path);
+
+    const input = createElement("input", "toggle-field__input");
+    input.type = "checkbox";
+    input.id = id;
+    input.checked = Boolean(value);
+    if (field.accessibleLabel) input.setAttribute("aria-label", field.accessibleLabel);
+
+    const control = createElement("span", "toggle-field__control");
+    control.setAttribute("aria-hidden", "true");
+    const copy = createElement("span", "toggle-field__copy");
+    copy.append(createElement("span", "toggle-field__label", field.label));
+    if (value === undefined) copy.append(makeMissingNote());
+
+    input.addEventListener("change", () => {
+      const nextValue = field.storedAsByte ? Number(input.checked) : input.checked;
+      recordChange(field.path, nextValue);
+      applyEffects(field, input.checked);
+      copy.querySelector(".field__missing")?.remove();
+      markEdited(label, field.path);
+      updateChangeSummary();
+    });
+
+    label.append(input, control, copy);
+    return label;
+  }
+
+  function renderObjectField(field, id) {
+    const value = getAtPath(state.document, field.path);
+    const card = createElement("fieldset", "object-field");
+    card.dataset.search = `${field.label} ${field.group || ""}`.toLowerCase();
+    const legend = createElement("legend", "object-field__title", field.label);
+    card.append(legend);
+
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      card.append(makeMissingNote());
+      return card;
+    }
+
+    const excluded = new Set(field.exclude || []);
+    const keys = Object.keys(value).filter((key) => {
+      const child = value[key];
+      return !excluded.has(key) && (typeof child === "number" || typeof child === "boolean");
+    });
+
+    if (keys.length === 0) {
+      card.append(createElement("span", "field__missing", "No editable values"));
+      return card;
+    }
+
+    const fields = createElement("div", "object-field__fields");
+    keys.forEach((key, index) => {
+      const childPath = `${field.path}.${key}`;
+      const childId = `${id}-${index}`;
+      const childValue = value[key];
+      const childField = {
+        ...field,
+        label: formatKey(key),
+        accessibleLabel: `${field.label}: ${formatKey(key)}`,
+        path: childPath,
+        step: Number.isInteger(childValue) ? 1 : "any",
+      };
+      const child = typeof childValue === "boolean"
+        ? renderToggleField(childField, childId)
+        : renderNumberField(childField, childId, childPath, formatKey(key));
+      fields.append(child);
+    });
+    card.append(fields);
+    return card;
+  }
+
+  function renderArcanaField(field, id) {
+    const levelPath = `${field.path}.Level`;
+    const unlockedPath = `${field.path}.Unlocked`;
+    const levelValue = getAtPath(state.document, levelPath);
+    const unlockedValue = getAtPath(state.document, unlockedPath);
+    const editedPaths = [levelPath, unlockedPath];
+    const card = createElement("fieldset", "arcana-card");
+    card.dataset.position = String(field.position);
+    markAnyEdited(card, editedPaths);
+
+    const legend = createElement("legend", "visually-hidden", field.label);
+    const visual = createElement("div", "arcana-card__visual");
+    const art = createElement("img", "arcana-card__art");
+    art.src = field.icon;
+    art.alt = "";
+    art.width = 276;
+    art.height = 429;
+    art.loading = "lazy";
+    art.decoding = "async";
+    const grasp = createElement("span", "arcana-card__grasp", String(field.grasp));
+    grasp.setAttribute("aria-label", `${field.grasp} Grasp`);
+    grasp.title = `${field.grasp} Grasp`;
+    visual.append(art, grasp);
+
+    const body = createElement("div", "arcana-card__body");
+    body.append(createElement("h3", "arcana-card__name", field.label));
+    const controls = createElement("div", "arcana-card__controls");
+
+    const rankLabel = createElement("label", "arcana-card__rank");
+    rankLabel.htmlFor = `${id}-rank`;
+    rankLabel.append(createElement("span", "arcana-card__control-label", "Rank"));
+    const rank = createElement("select", "arcana-card__select");
+    rank.id = `${id}-rank`;
+    rank.setAttribute("aria-label", `${field.label} rank`);
+    const availableLevels = [1, 2, 3];
+    if (Number.isInteger(levelValue) && !availableLevels.includes(levelValue)) {
+      availableLevels.push(levelValue);
+      availableLevels.sort((left, right) => left - right);
+    }
+    if (!Number.isInteger(levelValue)) {
+      const missingOption = createElement("option", "", "—");
+      missingOption.value = "";
+      missingOption.selected = true;
+      missingOption.disabled = true;
+      rank.append(missingOption);
+    }
+    availableLevels.forEach((level) => {
+      const option = createElement("option", "", ["I", "II", "III"][level - 1] || String(level));
+      option.value = String(level);
+      option.selected = level === levelValue;
+      rank.append(option);
+    });
+    rank.addEventListener("change", () => {
+      recordChange(levelPath, Number(rank.value));
+      markAnyEdited(card, editedPaths);
+      updateChangeSummary();
+    });
+    rankLabel.append(rank);
+
+    const unlockedLabel = createElement("label", "arcana-card__unlock");
+    const unlocked = createElement("input", "arcana-card__checkbox");
+    unlocked.type = "checkbox";
+    unlocked.id = `${id}-unlocked`;
+    unlocked.checked = Boolean(unlockedValue);
+    unlocked.setAttribute("aria-label", `${field.label} unlocked`);
+    unlocked.addEventListener("change", () => {
+      recordChange(unlockedPath, unlocked.checked);
+      markAnyEdited(card, editedPaths);
+      updateChangeSummary();
+    });
+    unlockedLabel.htmlFor = unlocked.id;
+    unlockedLabel.append(unlocked, createElement("span", "", "Unlocked"));
+
+    controls.append(rankLabel, unlockedLabel);
+    body.append(controls);
+    card.append(legend, visual, body);
+    return card;
+  }
+
+  function renderField(field, index) {
+    const id = `field-${state.activeSection}-${index}`;
+    if (field.type === "arcana") return renderArcanaField(field, id);
+    if (field.type === "toggle") return renderToggleField(field, id);
+    if (field.type === "object") return renderObjectField(field, id);
+    return renderNumberField(field, id);
+  }
+
+  function getSearchResults() {
+    return HadesEditorSearch.searchSections(getCatalog(), state.query);
+  }
+
+  function renderSection(results = getSearchResults()) {
+    const result = results.find(({ section }) => section.id === state.activeSection);
+    const section = result?.section || getActiveSection();
+    const visibleFields = result?.fields || [];
+
+    elements.panelTitle.textContent = section.label;
+    if (state.query.trim()) {
+      elements.panelCount.textContent = visibleFields.length === 1 ? "1 match" : `${visibleFields.length} matches`;
+    } else {
+      const itemName = section.layout === "arcana" ? "card" : "value";
+      elements.panelCount.textContent = section.fields.length === 1
+        ? `1 ${itemName}`
+        : `${section.fields.length} ${itemName}s`;
+    }
+    const grid = createElement(
+      "div",
+      section.layout === "arcana" ? "fields-grid fields-grid--arcana" : "fields-grid",
+    );
+    let previousGroup = null;
+
+    visibleFields.forEach((field) => {
+      if (field.group && field.group !== previousGroup) {
+        const heading = createElement("h3", "fields-grid__group", field.group);
+        grid.append(heading);
+        previousGroup = field.group;
+      } else if (!field.group) {
+        previousGroup = null;
       }
+      const fieldIndex = section.fields.indexOf(field);
+      grid.append(renderField(field, fieldIndex));
+    });
 
-      if (typeof value === "object") {
-        let listElement = applyList(value, item.label, item.location, saveData);
-        tabDiv.appendChild(listElement);
-        continue;
-      }
+    if (visibleFields.length === 0) {
+      const empty = createElement("p", "empty-state", "No matching values.");
+      elements.panel.replaceChildren(empty);
+    } else {
+      elements.panel.replaceChildren(grid);
+    }
 
-      // Set InputID that is used for Label and Input
-      let inputID = item.label.toLowerCase().replaceAll(" ", "");
+    const activeTab = elements.tabList.querySelector('[aria-selected="true"]');
+    if (activeTab) elements.panel.setAttribute("aria-labelledby", activeTab.id);
+  }
 
-      // Create Input
-      let input = document.createElement("input");
-      input.setAttribute("id", inputID);
+  function syncTabs(results) {
+    const hasQuery = Boolean(state.query.trim());
+    const hasAnyMatches = results.some(({ fields }) => fields.length > 0);
+    results.forEach(({ section, fields }) => {
+      const tab = elements.tabList.querySelector(`[data-section="${section.id}"]`);
+      const selected = section.id === state.activeSection;
+      tab.hidden = hasQuery && hasAnyMatches && fields.length === 0;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      tab.querySelector(".section-tab__count").textContent = String(
+        hasQuery ? fields.length : section.fields.length,
+      );
+    });
+  }
 
-      if(item.inputType === "checkbox") {
-        input.type = "checkbox";
+  function renderSearchState(focusPanel = false) {
+    const results = getSearchResults();
+    state.activeSection = HadesEditorSearch.chooseSectionId(results, state.activeSection);
+    syncTabs(results);
+    renderSection(results);
+    elements.panel.scrollTop = 0;
+    if (focusPanel) elements.panelTitle.focus();
+  }
 
-        input.checked = value;
+  function selectSection(sectionId, focusPanel = false) {
+    state.activeSection = sectionId;
+    renderSearchState(focusPanel);
+  }
 
-        input.onchange = function (event) {
-          change(saveData, item.location, event.target.checked);
-        }
+  function handleTabKeyboard(event) {
+    const tabs = Array.from(elements.tabList.querySelectorAll('[role="tab"]'))
+      .filter((tab) => !tab.hidden);
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    let nextIndex = currentIndex;
+    if (["ArrowRight", "ArrowDown"].includes(event.key)) nextIndex = (currentIndex + 1) % tabs.length;
+    if (["ArrowLeft", "ArrowUp"].includes(event.key)) nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === currentIndex && !["Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    tabs[nextIndex].focus();
+    selectSection(tabs[nextIndex].dataset.section);
+  }
 
+  function renderTabs() {
+    const catalog = getCatalog();
+    const fragment = document.createDocumentFragment();
+    catalog.sections.forEach((section, index) => {
+      const button = createElement("button", "section-tab");
+      button.type = "button";
+      button.id = `tab-${section.id}`;
+      button.role = "tab";
+      button.dataset.section = section.id;
+      button.setAttribute("aria-controls", "editor-panel");
+      button.setAttribute("aria-selected", String(index === 0));
+      button.tabIndex = index === 0 ? 0 : -1;
+      button.append(
+        createElement("span", "section-tab__label", section.label),
+        createElement("span", "section-tab__count", String(section.fields.length)),
+      );
+      button.addEventListener("click", () => selectSection(section.id, true));
+      button.addEventListener("keydown", handleTabKeyboard);
+      fragment.append(button);
+    });
+    elements.tabList.replaceChildren(fragment);
+    state.activeSection = catalog.sections[0].id;
+  }
+
+  function showEditor(file) {
+    const catalog = getCatalog();
+    const saveData = state.document.save_data;
+    elements.fileName.textContent = file.name;
+    elements.gameBadge.textContent = catalog.label;
+    elements.saveVersion.textContent = String(saveData.version);
+    elements.runCount.textContent = String(saveData.runs);
+    elements.outputName.value = file.name;
+    elements.uploadView.hidden = true;
+    elements.editorView.hidden = false;
+    document.body.classList.add("is-editing");
+    elements.search.value = "";
+    elements.clearSearch.hidden = true;
+    state.query = "";
+    renderTabs();
+    renderSearchState();
+    updateChangeSummary();
+    setStatus("");
+    document.title = `${file.name} — Hades Save Editor`;
+    global.scrollTo({ top: 0, behavior: "auto" });
+    elements.panelTitle.focus({ preventScroll: true });
+  }
+
+  function showUploadView() {
+    if (state.changedPaths.size > 0 && !global.confirm("Discard the current edits and choose another save?")) {
+      return;
+    }
+
+    state.document = null;
+    state.sourceBytes = null;
+    state.sourceFileName = "Profile1.sav";
+    state.activeSection = null;
+    state.changedPaths.clear();
+    state.query = "";
+    elements.editorView.hidden = true;
+    elements.uploadView.hidden = false;
+    document.body.classList.remove("is-editing");
+    document.title = "Hades Save Editor";
+    setStatus("");
+    global.scrollTo({ top: 0, behavior: "auto" });
+    elements.chooseFileButton.focus({ preventScroll: true });
+  }
+
+  async function loadFile(file) {
+    if (!file) return false;
+    if (state.changedPaths.size > 0 && !global.confirm("Discard the current edits and open another save?")) {
+      elements.fileInput.value = "";
+      return false;
+    }
+
+    setUploadError();
+    setStatus("Reading save…");
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const documentData = HadesSaveCodec.decode(bytes);
+      state.document = documentData;
+      state.sourceBytes = bytes;
+      state.sourceFileName = file.name;
+      state.changedPaths.clear();
+      showEditor(file);
+      return true;
+    } catch (error) {
+      const message = error instanceof HadesSaveCodec.SaveFormatError
+        ? error.message
+        : "The save file could not be read.";
+      setUploadError(message);
+      if (!state.document) {
+        elements.uploadView.hidden = false;
+        elements.editorView.hidden = true;
+        document.body.classList.remove("is-editing");
+        setStatus("");
       } else {
-        // Set Input Value
-        input.value = value;
-
-        // Set Input onChange action
-        input.onchange = function (event) {
-          change(saveData, item.location, event.target.value);
-          if(item.location.includes("Keepsake")) {
-            change(saveData, "save_data.luabin.0.GameState.GiftPresentation." + item.location.split(".")[5], true);
-            change(saveData, "save_data.luabin.0.GameState.TextLinesRecord." + item.pathTrue, true);
-          }
-        }
+        setStatus(message, "error");
       }
-
-      // Create Label
-      let label = document.createElement("label");
-      label.setAttribute("for", inputID);
-      label.innerText = item.label;
-
-      // Set Input inside of Label
-      label.appendChild(input);
-
-      // Set Label inside of Tab
-      tabDiv.appendChild(label);
+      return false;
+    } finally {
+      elements.fileInput.value = "";
+      elements.dropZone.classList.remove("is-dragging");
     }
   }
-}
 
-function applyDictionary(dict, item, data) {
-  let title = item.label;
-  let location = item.location;
+  function resetChanges() {
+    if (state.changedPaths.size === 0) return;
+    if (!global.confirm("Reset all edits made in this session?")) return;
+    try {
+      state.document = HadesSaveCodec.decode(state.sourceBytes);
+      state.changedPaths.clear();
+      renderSearchState();
+      updateChangeSummary();
+      setStatus("All edits were reset.", "success");
+    } catch (error) {
+      console.error(error);
+      setStatus("The original save could not be restored.", "error");
+    }
+  }
 
-  let dictElement = document.createElement("div");
-  dictElement.classList.add("save-edit__list");
+  function normalizedFileName() {
+    const entered = elements.outputName.value.trim() || state.sourceFileName;
+    return entered.toLowerCase().endsWith(".sav") ? entered : `${entered}.sav`;
+  }
 
-  // Create Title
-  let dictTitle = document.createElement("span");
-  dictTitle.innerText = title;
-  dictElement.appendChild(dictTitle);
+  function downloadSave() {
+    try {
+      const output = HadesSaveCodec.encode(state.document);
+      HadesSaveCodec.decode(output);
+      const blob = new Blob([output], { type: "application/octet-stream" });
+      const url = global.URL.createObjectURL(blob);
+      const link = createElement("a");
+      link.href = url;
+      link.download = normalizedFileName();
+      document.body.append(link);
+      link.click();
+      link.remove();
+      global.setTimeout(() => global.URL.revokeObjectURL(url), 30000);
+      setStatus("Save validated and downloaded.", "success");
+    } catch (error) {
+      const message = error instanceof HadesSaveCodec.SaveFormatError
+        ? error.message
+        : "The edited save could not be generated.";
+      setStatus(message, "error");
+    }
+  }
 
-  for (const key in dict) {
-    if (item.excludedFields && item.excludedFields.includes(key)) { continue; }
-    let label = document.createElement("label");
-    label.innerText = key;
-    dictElement.appendChild(label);
+  function setDirectoryHandle(handle) {
+    state.directoryHandle = handle;
+    elements.openFolderLabel.textContent = handle ? "Open saved folder" : "Choose save folder";
+    elements.changeFolderButton.hidden = !handle;
+  }
 
-    let dictItem = document.createElement("input");
+  function setFileHandle(handle) {
+    state.fileHandle = handle;
+  }
 
-    if(typeof dict[key] === "boolean") {
-      dictItem.type = "checkbox";
-      dictItem.checked = dict[key];
-      dictItem.onchange = function (event) {
-        change(data, location + "." + key, event.target.checked);
-      }
-    } else {
-      dictItem.value = dict[key];
-      dictItem.onchange = function (event) {
-        change(data, location + "." + key, event.target.value);
-      }
+  function setFolderError(message) {
+    setStatus("");
+    setUploadError(message);
+  }
+
+  async function refreshSaveFiles(directoryHandle) {
+    setUploadError();
+    setStatus("Reading save folder…");
+    const candidates = await HadesFileAccess.listSaveFiles(directoryHandle);
+    await renderSaveFileList(candidates, directoryHandle.name);
+    const message = candidates.length === 1
+      ? "Found 1 save file."
+      : `Found ${candidates.length} save files.`;
+    setStatus(message, "success");
+    return candidates;
+  }
+
+  async function chooseSaveFile() {
+    if (!HadesFileAccess.supportsOpenFilePicker()) {
+      elements.fileInput.click();
+      return;
     }
 
-    dictElement.appendChild(dictItem);
-  }
-
-  return dictElement;
-
-}
-
-
-function applyList(list, title, location, data) {
-  let listElement = document.createElement("div");
-  listElement.classList.add("save-edit__list");
-
-  // Create Title
-  let listTitle = document.createElement("span");
-  listTitle.innerText = title;
-  listElement.appendChild(listTitle);
-
-  // Create Add Button
-  let listAddButton = document.createElement("button");
-  listAddButton.attributes["data-iteration"] = 1;
-  listAddButton.innerText = "Add Field";
-
-  // Add Button Functionality
-  listAddButton.onclick = function () {
-
-    // Create new Input Element
-    let listItem = document.createElement("input");
-    listItem.value = "0";
-    listItem.onchange = function (event) {
-      change(data, location + "." + (Number(listAddButton.attributes["data-iteration"]) - 1), event.target.value);
+    try {
+      const startIn = state.directoryHandle || state.fileHandle || "documents";
+      const fileHandle = await HadesFileAccess.pickSaveFile(startIn);
+      if (!fileHandle) return;
+      setFileHandle(fileHandle);
+      await HadesFileAccess.rememberFile(fileHandle);
+      await loadFile(await fileHandle.getFile());
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.error(error);
+      setFolderError("The selected save file could not be opened.");
     }
-    // Add new Field to Save Data
-    let value = resolve(location, data);
-    value[listAddButton.attributes["data-iteration"]] = 0;
-    change(data, location, value);
-
-    // Add item
-    listElement.appendChild(listItem);
-    listAddButton.attributes["data-iteration"]++;
   }
 
-  listElement.appendChild(listAddButton);
+  async function openSaveFolder(forcePicker = false) {
+    if (!HadesFileAccess.supportsDirectoryPicker()) {
+      if ("webkitdirectory" in elements.folderInput) elements.folderInput.click();
+      else elements.fileInput.click();
+      return;
+    }
 
-  for (const key in list) {
-    let listItem = document.createElement("input");
-    listItem.value = list[key];
-    listElement.appendChild(listItem);
-    listAddButton.attributes["data-iteration"]++;
+    try {
+      const startIn = state.directoryHandle || state.fileHandle || "documents";
+      let directoryHandle = forcePicker ? null : state.directoryHandle;
+      if (directoryHandle && !(await HadesFileAccess.requestPermission(directoryHandle))) {
+        await HadesFileAccess.clearRememberedDirectory();
+        setDirectoryHandle(null);
+        setFolderError("Folder access was not granted. Choose the save folder again.");
+        return;
+      }
+
+      if (!directoryHandle) {
+        directoryHandle = await HadesFileAccess.pickDirectory(startIn);
+        if (!directoryHandle) return;
+        setDirectoryHandle(directoryHandle);
+        await HadesFileAccess.rememberDirectory(directoryHandle);
+      }
+
+      await refreshSaveFiles(directoryHandle);
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        setStatus("");
+        return;
+      }
+      console.error(error);
+      setFolderError("The selected folder could not be read. You can still choose a .sav file directly.");
+    }
   }
 
-  return listElement;
-}
+  async function loadSelectedFolder(files) {
+    const candidates = HadesFileAccess.listSelectedSaveFiles(files);
+    const folderName = candidates[0]?.relativePath?.split("/")[0] || "Selected folder";
+    elements.folderInput.value = "";
+    await renderSaveFileList(candidates, folderName);
+    const message = candidates.length === 1
+      ? "Found 1 save file."
+      : `Found ${candidates.length} save files.`;
+    setStatus(message, "success");
+  }
+
+  async function restoreFileHandles() {
+    if (!HadesFileAccess.supportsDirectoryPicker() && !HadesFileAccess.supportsOpenFilePicker()) return;
+    const [directoryHandle, fileHandle] = await Promise.all([
+      HadesFileAccess.getRememberedDirectory(),
+      HadesFileAccess.getRememberedFile(),
+    ]);
+    if (fileHandle) setFileHandle(fileHandle);
+    if (!directoryHandle) return;
+
+    setDirectoryHandle(directoryHandle);
+    if ((await HadesFileAccess.queryPermission(directoryHandle)) !== "granted") return;
+    try {
+      await refreshSaveFiles(directoryHandle);
+    } catch (error) {
+      console.error(error);
+      setFolderError("The remembered save folder could not be read. Open it again to continue.");
+    }
+  }
+
+  elements.fileInput.addEventListener("change", (event) => loadFile(event.target.files[0]));
+  elements.folderInput.addEventListener("change", (event) => loadSelectedFolder(event.target.files));
+  elements.chooseFileButton.addEventListener("click", chooseSaveFile);
+  elements.openFolderButton.addEventListener("click", () => openSaveFolder());
+  elements.changeFolderButton.addEventListener("click", () => openSaveFolder(true));
+  elements.replaceButton.addEventListener("click", showUploadView);
+  elements.resetButton.addEventListener("click", resetChanges);
+  elements.downloadButton.addEventListener("click", downloadSave);
+  connectDialog(elements.openChangesButton, elements.changesDialog, elements.closeChangesButton);
+  connectDialog(
+    elements.openSaveLocationsButton,
+    elements.saveLocationsDialog,
+    elements.closeSaveLocationsButton,
+  );
+
+  elements.search.addEventListener("input", () => {
+    state.query = elements.search.value;
+    elements.clearSearch.hidden = state.query.trim().length === 0;
+    renderSearchState();
+  });
+
+  elements.clearSearch.addEventListener("click", () => {
+    elements.search.value = "";
+    state.query = "";
+    elements.clearSearch.hidden = true;
+    renderSearchState();
+    elements.search.focus();
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    elements.dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.dropZone.classList.add("is-dragging");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((eventName) => {
+    elements.dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      elements.dropZone.classList.remove("is-dragging");
+    });
+  });
+
+  elements.dropZone.addEventListener("drop", (event) => loadFile(event.dataTransfer.files[0]));
+
+  global.addEventListener("beforeunload", (event) => {
+    if (state.changedPaths.size === 0) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
+  restoreFileHandles();
+
+  global.HadesSaveEditor = Object.freeze({ getAtPath, setAtPath });
+})(window);

@@ -1,132 +1,243 @@
-<!DOCTYPE html>
-<html class="no-js" lang="">
-
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Hades Save Editor - Now Supports Hades 2!</title>
-  <meta name="description" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <meta property="og:title" content="">
-  <meta property="og:type" content="">
-  <meta property="og:url" content="">
-  <meta property="og:image" content="">
-
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="apple-touch-icon" href="../icon.png">
-  <!-- Place favicon.ico in the root directory -->
-
+  <title>Hades Save Editor</title>
+  <meta name="description" content="Edit Hades and Hades II save files in your browser.">
+  <meta name="theme-color" content="#211b18">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8523652499483077"
+    crossorigin="anonymous"></script>
   <link rel="stylesheet" href="css/normalize.css">
   <link rel="stylesheet" href="css/main.css">
-
-  <meta name="theme-color" content="#fafafa">
+  <script defer src="js/adler32.js"></script>
+  <script defer src="js/lz4.js"></script>
+  <script defer src="js/save-codec.js"></script>
+  <script defer src="js/editor-data.js"></script>
+  <script defer src="js/file-access.js"></script>
+  <script defer src="js/editor-search.js"></script>
+  <script defer src="js/main.js"></script>
 </head>
-
 <body>
-  <!-- Floating Button That Sends User to the Download Button -->
-  <div class="floating-button">
-    <div class="floating-button__icon">
-      <a href="#file-download">
-        <svg width="2em" height="2em" viewBox="0 0 89 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M40.2574 97.2454C42.6005 99.5885 46.3995 99.5885 48.7426 97.2454L86.9264 59.0616C89.2696 56.7185 89.2696 52.9195 86.9264 50.5763C84.5833 48.2332 80.7843 48.2332 78.4411 50.5763L44.5 84.5175L10.5589 50.5763C8.21572 48.2332 4.41673 48.2332 2.07359 50.5763C-0.269562 52.9195 -0.269562 56.7185 2.07359 59.0616L40.2574 97.2454ZM38.5 0.997314L38.5 93.0028L50.5 93.0028L50.5 0.997315L38.5 0.997314Z" fill="#F2F0F0"/>
+  <a class="skip-link" href="#main-content">Skip to editor</a>
+
+  <main id="main-content" class="app-shell">
+    <section id="upload-view" class="upload-view" aria-labelledby="upload-title">
+      <div class="upload-heading">
+        <p class="eyebrow">Hades · Hades II</p>
+        <h1 id="upload-title">Open a save file</h1>
+      </div>
+
+      <div id="drop-zone" class="drop-zone">
+        <svg class="drop-zone__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
         </svg>
+        <h2>Drop a .sav file here</h2>
+        <span class="drop-zone__separator" aria-hidden="true">or</span>
+        <div class="drop-zone__actions">
+          <button id="choose-save-file" class="button button--primary" type="button">Choose file</button>
+          <button id="open-save-folder" class="button button--quiet" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>
+              <path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2"/>
+            </svg>
+            <span id="open-save-folder-label">Choose save folder</span>
+          </button>
+        </div>
+        <button id="change-save-folder" class="text-button text-button--upload" type="button" hidden>
+          Choose another folder
+        </button>
+        <input id="file-input" class="visually-hidden" type="file" accept=".sav,application/octet-stream">
+        <input id="folder-input" class="visually-hidden" type="file" accept=".sav,application/octet-stream"
+          webkitdirectory directory multiple>
+      </div>
+
+      <section id="save-file-browser" class="save-file-browser" aria-labelledby="save-files-title" hidden>
+        <header class="save-file-browser__header">
+          <h2 id="save-files-title">Save files</h2>
+          <p id="save-folder-name"></p>
+        </header>
+        <div id="save-file-list" class="save-file-list" role="list"></div>
+        <p id="save-file-empty" class="save-file-empty" hidden>No save files found.</p>
+      </section>
+
+      <div class="file-notes" aria-label="Before editing">
+        <p class="file-notes__help">
+          <span>Back up the save before editing.</span>
+          <button id="open-save-locations" class="text-button" type="button">Where are my save files?</button>
+        </p>
+        <p>For an active run, open <code>ProfileX_Temp.sav</code>.</p>
+      </div>
+      <p id="upload-error" class="inline-error" role="alert" hidden></p>
+    </section>
+
+    <section id="editor-view" class="editor-view" aria-label="Save editor" hidden>
+      <div class="file-summary">
+        <div class="file-summary__identity">
+          <svg class="file-summary__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/>
+            <path d="M14 3v5h4M9 13h6M9 17h4"/>
+          </svg>
+          <div>
+            <p id="loaded-file-name" class="file-summary__name"></p>
+            <div class="file-summary__meta">
+              <span id="game-badge" class="badge"></span>
+              <span>Version <strong id="save-version"></strong></span>
+              <span>Runs <strong id="run-count"></strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="file-summary__tools">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m16 16 4 4"/>
+            </svg>
+            <label class="visually-hidden" for="field-search">Search all categories</label>
+            <input id="field-search" type="search" placeholder="Search all categories" autocomplete="off">
+            <button id="clear-search" class="icon-button" type="button" aria-label="Clear search" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m7 7 10 10M17 7 7 17"/>
+              </svg>
+            </button>
+          </div>
+          <button id="replace-file" class="button button--quiet" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M19 12H5m7-7-7 7 7 7"/>
+            </svg>
+            Edit another file
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-layout">
+        <nav class="section-nav" aria-label="Save sections">
+          <div id="section-tabs" class="section-tabs" role="tablist" aria-orientation="vertical"></div>
+        </nav>
+
+        <section class="section-content" aria-labelledby="panel-title">
+          <header class="section-content__header">
+            <h2 id="panel-title" tabindex="-1"></h2>
+            <span id="panel-count" class="section-content__count"></span>
+          </header>
+          <div id="editor-panel" role="tabpanel" tabindex="0"></div>
+        </section>
+      </div>
+
+      <div class="save-bar" aria-label="Save edited file">
+        <div class="save-bar__state">
+          <strong id="edited-count">0 values edited</strong>
+          <button id="reset-changes" class="text-button" type="button" disabled>Reset changes</button>
+        </div>
+        <div class="save-bar__actions">
+          <label for="output-name">File name</label>
+          <input id="output-name" type="text" spellcheck="false" autocomplete="off">
+          <button id="download-save" class="button button--primary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/>
+            </svg>
+            Download save
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="app-footer__inner">
+      <a class="footer-email" href="mailto:dospacite@protonmail.com">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3" y="5" width="18" height="14" rx="2"/>
+          <path d="m4 7 8 6 8-6"/>
+        </svg>
+        <span>Feedback: dospacite@protonmail.com</span>
+      </a>
+      <button id="open-changes" class="footer-changes" type="button">What changed?</button>
+      <a class="button button--support" href="https://www.buymeacoffee.com/dospacite" target="_blank"
+        rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M5 8h11v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8Z"/>
+          <path d="M16 10h2a2 2 0 0 1 0 4h-2M7 4v2m4-2v2m4-2v2"/>
+        </svg>
+        Buy me a coffee
       </a>
     </div>
-  </div>
+  </footer>
 
-  <!-- File Drag and Drop Zone -->
-  <div class="container">
-    <!-- Checkbox to Specify if Hades 1 or Hades 2 -->
-    <div class="checkbox">
-      <label for="hades2" id="hades2_label">Check for Hades 2 -></label>
-      <input type="checkbox" id="hades2" name="hades2">
+  <dialog id="changes-dialog" class="changes-dialog" aria-labelledby="changes-dialog-title">
+    <div class="changes-dialog__panel">
+      <header class="changes-dialog__header">
+        <h2 id="changes-dialog-title">What changed?</h2>
+        <button id="close-changes" class="changes-dialog__close" type="button" aria-label="Close changes">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m7 7 10 10M17 7 7 17"/>
+          </svg>
+        </button>
+      </header>
+      <ul class="changes-dialog__list">
+        <li>Added icons.</li>
+        <li>Improved save stability.</li>
+        <li>Added File System API support.</li>
+        <li>Updated Arcana cards and keepsakes.</li>
+      </ul>
+      <p class="changes-dialog__feedback">
+        Don't like the changes? Feedback:
+        <a href="mailto:dospacite@protonmail.com">dospacite@protonmail.com</a>
+      </p>
     </div>
-    <div class="uploadFile" id="file-upload">
-      <span class="file" id="file">Drag Your<br>Save File Here</span>
-      <p class="file">or</p>
-      <label id="file-submit-button" class="button file" for="file-selector">Select a File</label>
-      <input type="file" id="file-selector" class="input file invisible" accept=".sav">
-    </div>
-  </div>
+  </dialog>
 
-  <div class="container">
-    <!-- Save Editing Part -->
-    <div class="save-edit" id="save-edit">
-      <div class="save-edit__tabs">
-        <div class="save-edit__tab hidden" data-tab="bossDrops">
-          Boss Drops
-        </div>
-        <div class="save-edit__tab hidden" data-tab="resources">
-          Resources
-        </div>
-        <div class="save-edit__tab hidden" data-tab="plants">
-          Plants
-        </div>
-        <div class="save-edit__tab hidden" data-tab="gifts">
-          Gifts
-        </div>
-        <div class="save-edit__tab hidden" data-tab="fishery">
-          Fishery
-        </div>
-        <div class="save-edit__tab hidden" data-tab="gifting">
-          Gifting
-        </div>
-        <div class="save-edit__tab hidden" data-tab="items">
-          Items
-        </div>
-        <div class="save-edit__tab hidden" data-tab="general">
-          General
-        </div>
-        <div class="save-edit__tab hidden" data-tab="currentRun">
-          Current Run
-        </div>
-        <div class="save-edit__tab hidden" data-tab="keepsakes">
-          Keepsakes
-        </div>
-        <div class="save-edit__tab hidden" data-tab="arcanaCards">
-          Arcana Cards
-        </div>
+  <dialog id="save-locations-dialog" class="changes-dialog save-locations-dialog"
+    aria-labelledby="save-locations-title">
+    <div class="changes-dialog__panel">
+      <header class="changes-dialog__header">
+        <h2 id="save-locations-title">Save file locations</h2>
+        <button id="close-save-locations" class="changes-dialog__close" type="button"
+          aria-label="Close save file locations">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m7 7 10 10M17 7 7 17"/>
+          </svg>
+        </button>
+      </header>
+      <div class="save-location-list">
+        <section class="save-location-group">
+          <h3>Hades II</h3>
+          <dl>
+            <div>
+              <dt>Windows</dt>
+              <dd><code>%USERPROFILE%\Saved Games\Hades II</code></dd>
+            </div>
+            <div>
+              <dt>macOS</dt>
+              <dd><code>~/Library/Application Support/Supergiant Games/Hades II</code></dd>
+            </div>
+            <div>
+              <dt>Steam Deck / Proton</dt>
+              <dd><code>/home/deck/.steam/steam/steamapps/compatdata/1145350/pfx/drive_c/users/steamuser/Saved Games/Hades II</code></dd>
+            </div>
+          </dl>
+        </section>
+        <section class="save-location-group">
+          <h3>Hades</h3>
+          <dl>
+            <div>
+              <dt>Windows</dt>
+              <dd><code>%USERPROFILE%\Documents\Saved Games\Hades</code></dd>
+            </div>
+            <div>
+              <dt>macOS</dt>
+              <dd><code>~/Library/Application Support/Supergiant Games/Hades</code></dd>
+            </div>
+          </dl>
+        </section>
       </div>
-      <div id="pre-select-content">
-        <span>Upload a File to Edit</span>
-      </div>
-      <div class="save-edit__content" id="gifting"></div>
-      <div class="save-edit__content" id="items"></div>
-      <div class="save-edit__content" id="general"></div>
-      <div class="save-edit__content" id="currentRun"></div>
-      <div class="save-edit__content" id="keepsakes"></div>
-      <div class="save-edit__content" id="arcanaCards">Don't set Level to 0 if its not already 0.</div>
-      <div class="save-edit__content" id="bossDrops"></div>
-      <div class="save-edit__content active" id="resources"></div>
-      <div class="save-edit__content" id="plants"></div>
-      <div class="save-edit__content" id="gifts"></div>
-      <div class="save-edit__content" id="fishery"></div>
     </div>
-  </div>
+  </dialog>
 
-  <div class="download-container">
-    <span class="download">
-      <label for="file-download-name">File Name: </label>
-      <input id="file-download-name" class="download" value="Profile2.sav">
-    </span>
-    <label id="file-download" class="button download disabled">Upload First</label>
-  </div>
+  <div id="app-status" class="status-message" role="status" aria-live="polite"></div>
 
-  <div class="container feedback-text">
-    <span>Are you looking to edit a value that's not available? Write me a feedback at dospacite@protonmail.com</span>
-    <span>With hadessaveeditor.app, you can cheat to edit your Hades save files or Hades 2 save files. Simply drag in your save file or click the button to select your Hades save file.</span>
-    <br>
-    <span>If you want to edit a value absolutely now and know what you're doing,
-      <br>go to the developer console and freely edit the save file by editing the saveData variable.</span>
-  </div>
-
-  <script src="js/vendor/modernizr-3.11.2.min.js"></script>
-  <script src="js/plugins.js"></script>
-  <!-- Path to LZ4 -->
-  <script src="js/adler32.js"></script>
-  <script type="text/javascript" src="js/lz4.js"></script>
-  <script src="js/Struct.js"></script>
-  <script type="text/javascript" src="js/main.js"></script>
+  <noscript>
+    <p class="noscript-message">JavaScript is required to edit save files.</p>
+  </noscript>
 </body>
-
 </html>
