@@ -1034,10 +1034,20 @@ input[type="search"]::-webkit-search-cancel-button {
   text-decoration: none;
 }
 
-.footer-changes {
-  min-height: 44px;
-  padding: 8px 6px;
+.footer-links {
+  display: flex;
   justify-self: center;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+}
+
+.footer-changes {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 6px;
   color: #eadfc9;
   background: transparent;
   border: 0;
