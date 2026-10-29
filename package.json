@@ -6,10 +6,10 @@
   "homepage": "https://hadessaveeditor.app/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Dospacite/HadesSaveEditor.git"
+    "url": "git+https://github.com/Dospacite/hades-save-editor.git"
   },
   "bugs": {
-    "url": "https://github.com/Dospacite/HadesSaveEditor/issues"
+    "url": "https://github.com/Dospacite/hades-save-editor/issues"
   },
   "license": "MIT",
   "engines": {
