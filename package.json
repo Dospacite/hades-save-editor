@@ -3,7 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "description": "Browser-based save editor for Hades and Hades II",
+  "homepage": "https://hadessaveeditor.app/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dospacite/HadesSaveEditor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Dospacite/HadesSaveEditor/issues"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node scripts/validate.js",
     "dev": "node scripts/serve.js",
