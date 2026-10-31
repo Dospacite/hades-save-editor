@@ -16,6 +16,8 @@
     "node": ">=18"
   },
   "scripts": {
+    "audit-game": "node scripts/audit-game-data.js",
+    "update-game-data": "node scripts/update-game-data.js",
     "build": "node scripts/validate.js",
     "dev": "node scripts/serve.js",
     "start": "npm run dev",

@@ -118,8 +118,10 @@ test("UTF-8 strings use byte lengths and remain intact", (context) => {
   if (!existsSync(fixture)) return context.skip("Local Hades example save is not present.");
 
   const parsed = codec.decode(readFileSync(fixture));
-  parsed.save_data.location = "Location_İstanbul";
+  parsed.save_data.luabin[0].GameState.LocationName = "Location_İstanbul";
   const reparsed = codec.decode(codec.encode(parsed));
+  assert.equal(reparsed.save_data.luabin[0].GameState.LocationName, "Location_İstanbul");
+  // The header copy follows the game data, the way the game writes it.
   assert.equal(reparsed.save_data.location, "Location_İstanbul");
 });
 
@@ -163,12 +165,13 @@ test("a damaged checksum is rejected", (context) => {
 });
 
 test("catalog contains the current game counts and omits removed entries", () => {
-  const catalogContext = loadBrowserScripts(["public/js/editor-data.js"]);
+  const catalogContext = loadBrowserScripts(["public/js/hades2-game-data.js", "public/js/editor-data.js"]);
   const catalog = catalogContext.HadesEditorCatalog;
   const hadesFish = catalog.hades.sections.find((section) => section.id === "fish");
   const hades2Fish = catalog.hades2.sections.find((section) => section.id === "fish");
   const keepsakes = catalog.hades2.sections.find((section) => section.id === "keepsakes");
-  const allPaths = catalog.hades2.sections.flatMap((section) => section.fields.map((field) => field.path));
+  const allPaths = catalog.hades2.sections.flatMap((section) =>
+    section.fields.flatMap((field) => (field.levels ? field.levels.flat() : [field.path])));
 
   assert.equal(hadesFish.fields.length, 18);
   assert.equal(hades2Fish.fields.length, 27);

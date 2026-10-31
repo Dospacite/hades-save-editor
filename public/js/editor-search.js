@@ -6,7 +6,7 @@
   }
 
   function fieldText(field) {
-    const pathParts = String(field.path || "").split(".");
+    const pathParts = String(field.path || field.levels?.[0]?.[0] || "").split(".");
     const key = pathParts[pathParts.length - 1];
     return normalize([
       field.label,
@@ -27,9 +27,11 @@
     });
   }
 
-  function chooseSectionId(results, activeSection) {
+  // A browse-only section (the Advanced tab) stays selected without a search.
+  function chooseSectionId(results, activeSection, query = "") {
     const activeResult = results.find((result) => result.section.id === activeSection);
     if (activeResult?.fields.length) return activeSection;
+    if (activeResult?.section.layout === "explorer" && !normalize(query)) return activeSection;
     return results.find((result) => result.fields.length)?.section.id
       || activeSection
       || results[0]?.section.id

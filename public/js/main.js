@@ -1,4 +1,4 @@
-/* global HadesEditorCatalog, HadesEditorSearch, HadesFileAccess, HadesSaveCodec */
+/* global HadesCheatLimits, HadesEditorCatalog, HadesEditorSearch, HadesFieldLogic, HadesFileAccess, HadesSaveCodec */
 
 (function startEditor(global) {
   "use strict";
@@ -17,6 +17,9 @@
     saveListGeneration: 0,
     statusTimer: null,
     dialogTrigger: null,
+    panelCountBase: "",
+    explorer: { path: [], filter: "", limit: 100 },
+    pendingEdit: null,
   };
 
   const elements = {
@@ -56,6 +59,10 @@
     openSaveLocationsButton: document.getElementById("open-save-locations"),
     saveLocationsDialog: document.getElementById("save-locations-dialog"),
     closeSaveLocationsButton: document.getElementById("close-save-locations"),
+    cheatDialog: document.getElementById("cheat-dialog"),
+    cheatList: document.getElementById("cheat-dialog-list"),
+    cheatConfirmButton: document.getElementById("cheat-dialog-confirm"),
+    cheatCancelButton: document.getElementById("cheat-dialog-cancel"),
   };
 
   function getAtPath(root, path) {
@@ -65,26 +72,49 @@
     );
   }
 
+  // `undefined` removes the key. The save format has no "undefined".
   function setAtPath(root, path, value) {
     const parts = path.split(".");
     let target = root;
-    parts.forEach((key, index) => {
+    for (let index = 0; index < parts.length; index += 1) {
+      const key = parts[index];
       if (index === parts.length - 1) {
-        target[key] = value;
+        if (value === undefined) delete target[key];
+        else target[key] = value;
         return;
       }
       if (target[key] == null || typeof target[key] !== "object") {
+        if (value === undefined) return;
         target[key] = Object.create(null);
       }
       target = target[key];
-    });
+    }
+  }
+
+  function readValue(path) {
+    return getAtPath(state.document, path);
   }
 
   function valuesMatch(left, right) {
     return Object.is(left, right);
   }
 
+  // The first ancestor of `path` that setAtPath would create or replace.
+  function firstMissingAncestor(path) {
+    const parts = path.split(".");
+    for (let index = 1; index < parts.length; index += 1) {
+      const prefix = parts.slice(0, index).join(".");
+      const value = getAtPath(state.document, prefix);
+      if (value == null || typeof value !== "object") return { path: prefix, value };
+    }
+    return null;
+  }
+
   function recordChange(path, value) {
+    const edit = state.pendingEdit;
+    if (edit && !edit.writes.has(path)) {
+      edit.writes.set(path, { value: getAtPath(state.document, path), created: firstMissingAncestor(path) });
+    }
     if (!state.changedPaths.has(path)) {
       state.changedPaths.set(path, getAtPath(state.document, path));
     }
@@ -95,11 +125,93 @@
     }
   }
 
-  function applyEffects(field, value) {
+  // What an unchecked toggle writes. Set-like tables drop the key instead.
+  function offValue(field) {
+    return field.removeWhenOff ? undefined : false;
+  }
+
+  // `mirror` effects follow the field on and off. Others only apply when on.
+  function applyEffects(field, active) {
     (field.effects || []).forEach((effect) => {
-      if (effect.when === "truthy" && !value) return;
+      if (effect.mirror) {
+        recordChange(effect.path, active ? true : offValue(field));
+        return;
+      }
+      if (effect.when === "truthy" && !active) return;
       recordChange(effect.path, effect.value);
     });
+  }
+
+  // ---------- Hades II cheat limits ----------
+
+  function currentViolations() {
+    return HadesCheatLimits.findViolations(state.document.game, getAtPath(state.document, "save_data.luabin.0"));
+  }
+
+  // Runs `apply`, which makes one edit through recordChange. If the edit
+  // newly crosses a limit the game checks, asks first. Resolves to false
+  // when the user undoes the edit.
+  async function runEdit(apply) {
+    const before = currentViolations();
+    const edit = { writes: new Map() };
+    state.pendingEdit = edit;
+    try {
+      apply();
+    } finally {
+      state.pendingEdit = null;
+    }
+    const added = HadesCheatLimits.newViolations(before, currentViolations());
+    if (added.length === 0 || await askAboutCheatLimits(added)) return true;
+    [...edit.writes.entries()].reverse().forEach(([path, previous]) => {
+      if (previous.created) setAtPath(state.document, previous.created.path, previous.created.value);
+      recordChange(path, previous.value);
+    });
+    return false;
+  }
+
+  function formatValue(value) {
+    return typeof value === "number" ? value.toLocaleString() : String(value);
+  }
+
+  function askAboutCheatLimits(violations) {
+    const dialog = elements.cheatDialog;
+    const items = violations.map((violation) => {
+      const item = createElement("li");
+      item.append(
+        createElement("strong", "", `${violation.label}: ${formatValue(violation.value)}`),
+        createElement("span", "", ` (flagged at ${violation.limitText}) `),
+        createElement("code", "", violation.path),
+      );
+      return item;
+    });
+    elements.cheatList.replaceChildren(...items);
+    return new Promise((resolve) => {
+      const trigger = document.activeElement;
+      const choose = (keep) => () => dialog.close(keep ? "keep" : "undo");
+      const onKeep = choose(true);
+      const onUndo = choose(false);
+      dialog.returnValue = "";
+      elements.cheatConfirmButton.addEventListener("click", onKeep);
+      elements.cheatCancelButton.addEventListener("click", onUndo);
+      dialog.addEventListener("close", () => {
+        elements.cheatConfirmButton.removeEventListener("click", onKeep);
+        elements.cheatCancelButton.removeEventListener("click", onUndo);
+        if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+        resolve(dialog.returnValue === "keep");
+      }, { once: true });
+      dialog.showModal();
+      elements.cheatCancelButton.focus();
+    });
+  }
+
+  // Redraws the panel after an undone edit, keeping the scroll position.
+  function refreshAfterUndo(focusId) {
+    const scrollY = global.scrollY;
+    renderSection();
+    updateChangeSummary();
+    global.scrollTo({ top: scrollY, behavior: "auto" });
+    if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
+    setStatus("The change was undone.");
   }
 
   function createElement(tag, className, text) {
@@ -175,6 +287,15 @@
     const count = state.changedPaths.size;
     elements.editedCount.textContent = count === 1 ? "1 value edited" : `${count} values edited`;
     elements.resetButton.disabled = count === 0;
+    updatePanelCount();
+  }
+
+  // Panel header count, plus a live total such as Fear or Grasp.
+  function updatePanelCount(base = state.panelCountBase) {
+    state.panelCountBase = base;
+    const section = state.document && getActiveSection();
+    const summary = section ? HadesFieldLogic.sectionSummary(section, readValue) : "";
+    elements.panelCount.textContent = summary ? `${base} · ${summary}` : base;
   }
 
   function formatFileSize(bytes) {
@@ -225,7 +346,9 @@
     if (summary.header) {
       const { game, save_data: saveData } = summary.header;
       const gameLabel = HadesEditorCatalog[game]?.label || game;
-      const runLabel = saveData.runs === 1 ? "1 run" : `${saveData.runs} runs`;
+      const runLabel = saveData.runs === undefined
+        ? `version ${saveData.version}`
+        : saveData.runs === 1 ? "1 run" : `${saveData.runs} runs`;
       copy.append(
         createElement(
           "span",
@@ -235,7 +358,7 @@
         createElement(
           "span",
           "save-file-entry__meta",
-          `Saved ${formatSaveDate(saveData.timestamp)} · ${formatFileSize(candidate.file.size)}`,
+          `${saveData.timestamp === undefined ? "Old save" : `Saved ${formatSaveDate(saveData.timestamp)}`} · ${formatFileSize(candidate.file.size)}`,
         ),
       );
       button.setAttribute(
@@ -344,11 +467,15 @@
         input.reportValidity();
         return;
       }
-      recordChange(path, nextValue);
-      applyEffects(field, nextValue);
-      row.querySelector(".field__missing")?.remove();
-      markEdited(row, path);
-      updateChangeSummary();
+      runEdit(() => {
+        recordChange(path, nextValue);
+        applyEffects(field, nextValue);
+      }).then((kept) => {
+        if (!kept) return refreshAfterUndo(input.id);
+        row.querySelector(".field__missing")?.remove();
+        markEdited(row, path);
+        updateChangeSummary();
+      });
     });
 
     row.append(labelElement, input);
@@ -372,17 +499,31 @@
     control.setAttribute("aria-hidden", "true");
     const copy = createElement("span", "toggle-field__copy");
     copy.append(createElement("span", "toggle-field__label", field.label));
-    if (value === undefined) copy.append(makeMissingNote());
+    if (field.description) {
+      const description = createElement("span", "toggle-field__description", field.description);
+      description.id = `${id}-description`;
+      input.setAttribute("aria-describedby", description.id);
+      copy.append(description);
+    }
+    // For set-like tables a missing key just means "off".
+    if (value === undefined && !field.removeWhenOff) copy.append(makeMissingNote());
 
     input.addEventListener("change", () => {
-      const nextValue = field.storedAsByte ? Number(input.checked) : input.checked;
-      recordChange(field.path, nextValue);
-      applyEffects(field, input.checked);
-      copy.querySelector(".field__missing")?.remove();
-      markEdited(label, field.path);
-      updateChangeSummary();
+      let nextValue = input.checked;
+      if (field.storedAsByte) nextValue = Number(input.checked);
+      else if (!input.checked) nextValue = offValue(field);
+      runEdit(() => {
+        recordChange(field.path, nextValue);
+        applyEffects(field, input.checked);
+      }).then((kept) => {
+        if (!kept) return refreshAfterUndo(input.id);
+        copy.querySelector(".field__missing")?.remove();
+        markEdited(label, field.path);
+        updateChangeSummary();
+      });
     });
 
+    if (field.description) label.classList.add("toggle-field--described");
     label.append(input, control, copy);
     return label;
   }
@@ -484,9 +625,11 @@
       rank.append(option);
     });
     rank.addEventListener("change", () => {
-      recordChange(levelPath, Number(rank.value));
-      markAnyEdited(card, editedPaths);
-      updateChangeSummary();
+      runEdit(() => recordChange(levelPath, Number(rank.value))).then((kept) => {
+        if (!kept) return refreshAfterUndo(rank.id);
+        markAnyEdited(card, editedPaths);
+        updateChangeSummary();
+      });
     });
     rankLabel.append(rank);
 
@@ -497,9 +640,11 @@
     unlocked.checked = Boolean(unlockedValue);
     unlocked.setAttribute("aria-label", `${field.label} unlocked`);
     unlocked.addEventListener("change", () => {
-      recordChange(unlockedPath, unlocked.checked);
-      markAnyEdited(card, editedPaths);
-      updateChangeSummary();
+      runEdit(() => recordChange(unlockedPath, unlocked.checked)).then((kept) => {
+        if (!kept) return refreshAfterUndo(unlocked.id);
+        markAnyEdited(card, editedPaths);
+        updateChangeSummary();
+      });
     });
     unlockedLabel.htmlFor = unlocked.id;
     unlockedLabel.append(unlocked, createElement("span", "", "Unlocked"));
@@ -510,8 +655,96 @@
     return card;
   }
 
+  // Picks one option: aspect ranks, familiar upgrades, vows, Grasp, badges.
+  // Up to six options show as a segmented control, more as a select.
+  function renderLevelField(field, id) {
+    const paths = HadesFieldLogic.levelPaths(field);
+    const level = HadesFieldLogic.currentLevel(field, readValue);
+    const row = createElement("div", "field field--level");
+    row.dataset.search = `${field.label} ${field.group || ""}`.toLowerCase();
+    markAnyEdited(row, paths);
+
+    const header = createElement("div", "field__label");
+    const copy = createElement("span", "field__label-copy");
+    const title = createElement("span", "field__label-text", field.label);
+    title.id = `${id}-label`;
+    const meta = createElement("span", "field__meta field__meta--inline");
+    if (field.tag) meta.append(createElement("span", "field__tag", field.tag));
+    const points = field.points ? createElement("span", "field__points") : null;
+    if (points) meta.append(points);
+    if (!field.levels && level === undefined) meta.append(makeMissingNote());
+    copy.append(title, meta);
+    const icon = makeFieldIcon(field);
+    header.append(...[icon, copy].filter(Boolean));
+
+    const showPoints = (value) => {
+      if (!points) return;
+      const fear = HadesFieldLogic.pointsAt(field.points, value);
+      points.textContent = `${fear} Fear`;
+      points.classList.toggle("is-active", fear > 0);
+    };
+    showPoints(level || 0);
+
+    const commit = (value, focusId) => {
+      runEdit(() => {
+        HadesFieldLogic.levelWrites(field, value).forEach((write) => recordChange(write.path, write.value));
+        applyEffects(field, value > 0);
+      }).then((kept) => {
+        if (!kept) return refreshAfterUndo(focusId);
+        row.querySelector(".field__missing")?.remove();
+        markAnyEdited(row, paths);
+        showPoints(value);
+        updateChangeSummary();
+      });
+    };
+
+    let control;
+    if (field.options.length <= 6) {
+      control = createElement("div", "segmented");
+      control.setAttribute("role", "radiogroup");
+      control.setAttribute("aria-labelledby", title.id);
+      field.options.forEach((option, index) => {
+        const optionLabel = createElement("label", "segmented__option");
+        const input = createElement("input", "segmented__input");
+        input.type = "radio";
+        input.name = id;
+        input.id = `${id}-${index}`;
+        input.value = String(option.value);
+        input.checked = option.value === level;
+        input.addEventListener("change", () => {
+          if (input.checked) commit(option.value, input.id);
+        });
+        optionLabel.htmlFor = input.id;
+        optionLabel.append(input, createElement("span", "segmented__text", option.label));
+        control.append(optionLabel);
+      });
+    } else {
+      control = createElement("select", "field__select");
+      control.id = id;
+      control.setAttribute("aria-labelledby", title.id);
+      if (level === undefined || !field.options.some((option) => option.value === level)) {
+        const placeholder = createElement("option", "", level === undefined ? "—" : String(level));
+        placeholder.value = "";
+        placeholder.selected = true;
+        placeholder.disabled = true;
+        control.append(placeholder);
+      }
+      field.options.forEach((option) => {
+        const element = createElement("option", "", option.label);
+        element.value = String(option.value);
+        element.selected = option.value === level;
+        control.append(element);
+      });
+      control.addEventListener("change", () => commit(Number(control.value), control.id));
+    }
+
+    row.append(header, control);
+    return row;
+  }
+
   function renderField(field, index) {
     const id = `field-${state.activeSection}-${index}`;
+    if (field.type === "level") return renderLevelField(field, id);
     if (field.type === "arcana") return renderArcanaField(field, id);
     if (field.type === "toggle") return renderToggleField(field, id);
     if (field.type === "object") return renderObjectField(field, id);
@@ -522,44 +755,334 @@
     return HadesEditorSearch.searchSections(getCatalog(), state.query);
   }
 
-  function renderSection(results = getSearchResults()) {
-    const result = results.find(({ section }) => section.id === state.activeSection);
-    const section = result?.section || getActiveSection();
-    const visibleFields = result?.fields || [];
+  function renderSectionNote(section) {
+    const note = createElement("p", "section-note", section.description);
+    if (section.tone === "warning") note.classList.add("section-note--warning");
+    return note;
+  }
 
-    elements.panelTitle.textContent = section.label;
-    if (state.query.trim()) {
-      elements.panelCount.textContent = visibleFields.length === 1 ? "1 match" : `${visibleFields.length} matches`;
-    } else {
-      const itemName = section.layout === "arcana" ? "card" : "value";
-      elements.panelCount.textContent = section.fields.length === 1
-        ? `1 ${itemName}`
-        : `${section.fields.length} ${itemName}s`;
-    }
-    const grid = createElement(
-      "div",
-      section.layout === "arcana" ? "fields-grid fields-grid--arcana" : "fields-grid",
-    );
+  function renderFieldsGrid(fields, section, className = "fields-grid", indexOf = (field) => section.fields.indexOf(field)) {
+    const grid = createElement("div", className);
     let previousGroup = null;
-
-    visibleFields.forEach((field) => {
+    fields.forEach((field) => {
       if (field.group && field.group !== previousGroup) {
-        const heading = createElement("h3", "fields-grid__group", field.group);
-        grid.append(heading);
+        grid.append(createElement("h3", "fields-grid__group", field.group));
         previousGroup = field.group;
       } else if (!field.group) {
         previousGroup = null;
       }
-      const fieldIndex = section.fields.indexOf(field);
-      grid.append(renderField(field, fieldIndex));
+      grid.append(renderField(field, indexOf(field)));
     });
+    return grid;
+  }
+
+  function renderSection(results = getSearchResults()) {
+    const result = results.find(({ section }) => section.id === state.activeSection);
+    const section = result?.section || getActiveSection();
+    const visibleFields = result?.fields || [];
+    const hasQuery = Boolean(state.query.trim());
+
+    elements.panelTitle.textContent = section.label;
+    if (section.layout === "explorer") {
+      renderExplorer(section, hasQuery ? visibleFields : null);
+      return;
+    }
+
+    if (hasQuery) {
+      updatePanelCount(visibleFields.length === 1 ? "1 match" : `${visibleFields.length} matches`);
+    } else {
+      const itemName = section.layout === "arcana" ? "card" : "value";
+      updatePanelCount(section.fields.length === 1 ? `1 ${itemName}` : `${section.fields.length} ${itemName}s`);
+    }
+
+    const content = createElement("div", "section-body");
+    if (section.description) content.append(renderSectionNote(section));
+    if (section.toolbar?.length && !hasQuery) {
+      content.append(renderFieldsGrid(
+        section.toolbar,
+        section,
+        "fields-grid fields-grid--toolbar",
+        (field) => `toolbar-${section.toolbar.indexOf(field)}`,
+      ));
+    }
 
     if (visibleFields.length === 0) {
-      const empty = createElement("p", "empty-state", "No matching values.");
-      elements.panel.replaceChildren(empty);
+      content.append(createElement("p", "empty-state", "No matching values."));
     } else {
-      elements.panel.replaceChildren(grid);
+      content.append(renderFieldsGrid(
+        visibleFields,
+        section,
+        section.layout === "arcana" ? "fields-grid fields-grid--arcana" : "fields-grid",
+      ));
     }
+    elements.panel.replaceChildren(content);
+
+    const activeTab = elements.tabList.querySelector('[aria-selected="true"]');
+    if (activeTab) elements.panel.setAttribute("aria-labelledby", activeTab.id);
+  }
+
+  // ---------- Advanced view: browse and edit any value in the save ----------
+
+  const LUA_ROOT = ["save_data", "luabin", "0"];
+  const HEADER_PATH = ["save_data"];
+  // Header values shown but not edited: the format itself, engine data the
+  // game ignores, and values the editor copies from the game data on
+  // download (HadesSaveCodec.syncHeader), the same way the game does.
+  const LOCKED_HEADER_KEYS = new Set([
+    "version", "version_flags", "notable_lua_data", "luabin",
+    "location", "runs", "accumulated_meta_points", "active_shrine_points",
+    "meta_upgrade_level", "cosmetics_points", "hard_mode",
+  ]);
+  const EXPLORER_PAGE = 100;
+
+  function samePath(left, right) {
+    return left.length === right.length && left.every((part, index) => part === right[index]);
+  }
+
+  function explorerNote(section, parent, key) {
+    const notes = section.notes || {};
+    if (samePath(parent, LUA_ROOT)) return notes.root?.[key];
+    if (samePath(parent, [...LUA_ROOT, "GameState"])) return notes.GameState?.[key];
+    if (samePath(parent, HEADER_PATH)) return notes.header?.[key];
+    return undefined;
+  }
+
+  function explorerEntries(section, path) {
+    if (path.length === 0) {
+      const root = getAtPath(state.document, LUA_ROOT.join(".")) || {};
+      return [
+        { key: "Header", path: HEADER_PATH, note: "Outer save details, like the version and run count." },
+        ...HadesFieldLogic.sortedKeys(root).map((key) => ({
+          key,
+          path: [...LUA_ROOT, key],
+          note: explorerNote(section, LUA_ROOT, key),
+        })),
+      ];
+    }
+    const node = getAtPath(state.document, path.join("."));
+    if (!node || typeof node !== "object") return [];
+    return HadesFieldLogic.sortedKeys(node)
+      .filter((key) => !(samePath(path, HEADER_PATH) && key === "luabin"))
+      .map((key) => ({
+        key,
+        path: [...path, key],
+        note: explorerNote(section, path, key),
+        locked: isLockedPath([...path, key]),
+      }));
+  }
+
+  // Everything below a locked header key is locked too.
+  function isLockedPath(path) {
+    return path[0] === "save_data" && path[1] !== "luabin"
+      && (LOCKED_HEADER_KEYS.has(path[1]) || /^legacy_/.test(path[1] || ""));
+  }
+
+  function explorerCrumbs(path) {
+    const crumbs = [{ label: "Save", path: [] }];
+    const inLua = path.length > LUA_ROOT.length && samePath(path.slice(0, LUA_ROOT.length), LUA_ROOT);
+    const base = inLua ? LUA_ROOT : HEADER_PATH;
+    if (!inLua && path.length) crumbs.push({ label: "Header", path: HEADER_PATH });
+    path.slice(base.length).forEach((part, index) => {
+      crumbs.push({ label: part, path: path.slice(0, base.length + index + 1) });
+    });
+    return crumbs;
+  }
+
+  function openExplorerPath(path) {
+    state.explorer = { path, filter: "", limit: EXPLORER_PAGE };
+    if (state.query.trim()) {
+      elements.search.value = "";
+      state.query = "";
+      elements.clearSearch.hidden = true;
+      renderSearchState();
+    } else {
+      renderSection();
+    }
+    elements.panel.querySelector(".explorer__crumb[aria-current]")?.focus();
+  }
+
+  function hasEditsBelow(path) {
+    const prefix = `${path.join(".")}.`;
+    for (const changed of state.changedPaths.keys()) {
+      if (changed.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  function renderExplorerValue(entry, row) {
+    const pathText = entry.path.join(".");
+    const value = entry.path.length ? getAtPath(state.document, pathText) : undefined;
+    const kind = entry.key === "Header" && samePath(entry.path, HEADER_PATH)
+      ? "table"
+      : HadesFieldLogic.valueKind(value);
+    const editable = !entry.locked && entry.path.every(HadesFieldLogic.canEditKey);
+    const label = `${entry.key} value`;
+
+    const commit = (next) => {
+      runEdit(() => recordChange(pathText, next)).then((kept) => {
+        if (!kept) return refreshAfterUndo();
+        row.classList.toggle("is-edited", state.changedPaths.has(pathText));
+        updateChangeSummary();
+      });
+    };
+
+    if (kind === "table") {
+      const size = entry.key === "Header" && samePath(entry.path, HEADER_PATH)
+        ? Object.keys(value || {}).length - 1
+        : Object.keys(value).length;
+      const open = createElement("button", "explorer-row__open");
+      open.type = "button";
+      open.setAttribute("aria-label", `Open ${entry.key}, ${size} entries`);
+      open.append(
+        createElement("span", "", size === 1 ? "1 entry" : `${size} entries`),
+        createElement("span", "explorer-row__chevron", "›"),
+      );
+      open.addEventListener("click", () => openExplorerPath(entry.path));
+      if (hasEditsBelow(entry.path)) row.classList.add("has-edits");
+      return open;
+    }
+    if (kind === "nil") return createElement("span", "explorer-row__static", value === null ? "nil" : "Not in save");
+    if (!editable) {
+      const text = Array.isArray(value) ? `${value.length} items` : String(value);
+      return createElement("span", "explorer-row__static", text);
+    }
+
+    if (kind === "boolean") {
+      const wrapper = createElement("label", "explorer-switch");
+      const input = createElement("input", "toggle-field__input");
+      input.type = "checkbox";
+      input.checked = value;
+      input.setAttribute("aria-label", label);
+      const control = createElement("span", "toggle-field__control");
+      control.setAttribute("aria-hidden", "true");
+      const text = createElement("span", "explorer-switch__text", value ? "true" : "false");
+      input.addEventListener("change", () => {
+        text.textContent = input.checked ? "true" : "false";
+        commit(input.checked);
+      });
+      wrapper.append(input, control, text);
+      return wrapper;
+    }
+
+    const input = createElement("input", "field__input explorer-row__input");
+    input.setAttribute("aria-label", label);
+    input.spellcheck = false;
+    if (kind === "number") {
+      input.type = "number";
+      input.step = "any";
+      input.inputMode = "decimal";
+      input.value = String(value);
+      input.addEventListener("change", () => {
+        const next = Number(input.value);
+        if (input.value.trim() === "" || !Number.isFinite(next)) {
+          input.value = String(getAtPath(state.document, pathText));
+          return;
+        }
+        commit(next);
+      });
+    } else {
+      input.type = "text";
+      input.value = value;
+      input.addEventListener("change", () => commit(input.value));
+    }
+    return input;
+  }
+
+  function renderExplorerRows(section, list, entries) {
+    const filter = state.explorer.filter.trim().toLowerCase();
+    const matches = filter
+      ? entries.filter((entry) => `${entry.key} ${entry.note || ""}`.toLowerCase().includes(filter))
+      : entries;
+    const shown = matches.slice(0, state.explorer.limit);
+    const fragment = document.createDocumentFragment();
+
+    shown.forEach((entry) => {
+      const row = createElement("div", "explorer-row");
+      row.setAttribute("role", "listitem");
+      if (entry.path.length) row.classList.toggle("is-edited", state.changedPaths.has(entry.path.join(".")));
+      const keyCell = createElement("div", "explorer-row__key");
+      keyCell.append(createElement("code", "explorer-row__name", entry.key));
+      if (entry.note) keyCell.append(createElement("span", "explorer-row__note", entry.note));
+      row.append(keyCell, renderExplorerValue(entry, row));
+      fragment.append(row);
+    });
+
+    if (matches.length === 0) {
+      fragment.append(createElement("p", "empty-state", "No matching keys."));
+    }
+    list.replaceChildren(fragment);
+
+    const more = list.parentElement.querySelector(".explorer__more");
+    const remaining = matches.length - shown.length;
+    more.hidden = remaining <= 0;
+    more.textContent = `Show ${Math.min(remaining, EXPLORER_PAGE)} more of ${remaining}`;
+    updatePanelCount(filter
+      ? `${matches.length} of ${entries.length} entries`
+      : `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`);
+  }
+
+  function renderExplorer(section, searchFields) {
+    const container = createElement("div", "explorer");
+    if (section.description) container.append(renderSectionNote(section));
+
+    let entries;
+    const bar = createElement("div", "explorer__bar");
+    const crumbs = createElement("nav", "explorer__crumbs");
+    crumbs.setAttribute("aria-label", "Location in the save");
+
+    if (searchFields) {
+      // Global search: matching GameState keys, wherever the browser is.
+      const parent = [...LUA_ROOT, "GameState"];
+      entries = searchFields.map((field) => ({
+        key: field.label,
+        path: [...parent, field.label],
+        note: field.note,
+      }));
+      crumbs.append(createElement("span", "explorer__crumb explorer__crumb--static", "Search results in GameState"));
+    } else {
+      const path = state.explorer.path;
+      entries = explorerEntries(section, path);
+      const trail = explorerCrumbs(path);
+      trail.forEach((crumb, index) => {
+        if (index > 0) crumbs.append(createElement("span", "explorer__separator", "/"));
+        const current = index === trail.length - 1;
+        const element = createElement(current ? "span" : "button", "explorer__crumb", crumb.label);
+        if (current) {
+          element.setAttribute("aria-current", "location");
+          element.tabIndex = -1;
+        } else {
+          element.type = "button";
+          element.addEventListener("click", () => openExplorerPath(crumb.path));
+        }
+        crumbs.append(element);
+      });
+    }
+
+    const filter = createElement("input", "explorer__filter");
+    filter.type = "search";
+    filter.placeholder = "Filter this list";
+    filter.autocomplete = "off";
+    filter.setAttribute("aria-label", "Filter keys in this list");
+    filter.value = state.explorer.filter;
+    bar.append(crumbs, filter);
+
+    const list = createElement("div", "explorer__list");
+    list.setAttribute("role", "list");
+    const more = createElement("button", "button button--quiet explorer__more");
+    more.type = "button";
+    more.addEventListener("click", () => {
+      state.explorer.limit += EXPLORER_PAGE;
+      renderExplorerRows(section, list, entries);
+    });
+    filter.addEventListener("input", () => {
+      state.explorer.filter = filter.value;
+      state.explorer.limit = EXPLORER_PAGE;
+      renderExplorerRows(section, list, entries);
+    });
+
+    container.append(bar, list, more);
+    elements.panel.replaceChildren(container);
+    renderExplorerRows(section, list, entries);
 
     const activeTab = elements.tabList.querySelector('[aria-selected="true"]');
     if (activeTab) elements.panel.setAttribute("aria-labelledby", activeTab.id);
@@ -574,15 +1097,16 @@
       tab.hidden = hasQuery && hasAnyMatches && fields.length === 0;
       tab.setAttribute("aria-selected", String(selected));
       tab.tabIndex = selected ? 0 : -1;
-      tab.querySelector(".section-tab__count").textContent = String(
-        hasQuery ? fields.length : section.fields.length,
-      );
+      const count = tab.querySelector(".section-tab__count");
+      count.textContent = String(hasQuery ? fields.length : section.fields.length);
+      // The Advanced list is for search only, so its size means nothing at rest.
+      count.hidden = section.layout === "explorer" && !hasQuery;
     });
   }
 
   function renderSearchState(focusPanel = false) {
     const results = getSearchResults();
-    state.activeSection = HadesEditorSearch.chooseSectionId(results, state.activeSection);
+    state.activeSection = HadesEditorSearch.chooseSectionId(results, state.activeSection, state.query);
     syncTabs(results);
     renderSection(results);
     elements.panel.scrollTop = 0;
@@ -625,6 +1149,7 @@
         createElement("span", "section-tab__label", section.label),
         createElement("span", "section-tab__count", String(section.fields.length)),
       );
+      if (section.layout === "explorer") button.querySelector(".section-tab__count").hidden = true;
       button.addEventListener("click", () => selectSection(section.id, true));
       button.addEventListener("keydown", handleTabKeyboard);
       fragment.append(button);
@@ -639,7 +1164,7 @@
     elements.fileName.textContent = file.name;
     elements.gameBadge.textContent = catalog.label;
     elements.saveVersion.textContent = String(saveData.version);
-    elements.runCount.textContent = String(saveData.runs);
+    elements.runCount.textContent = saveData.runs === undefined ? "—" : String(saveData.runs);
     elements.outputName.value = file.name;
     elements.uploadView.hidden = true;
     elements.editorView.hidden = false;
@@ -647,6 +1172,7 @@
     elements.search.value = "";
     elements.clearSearch.hidden = true;
     state.query = "";
+    state.explorer = { path: [], filter: "", limit: 100 };
     renderTabs();
     renderSearchState();
     updateChangeSummary();

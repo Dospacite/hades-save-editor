@@ -13,7 +13,10 @@
   <script defer src="js/adler32.js"></script>
   <script defer src="js/lz4.js"></script>
   <script defer src="js/save-codec.js"></script>
+  <script defer src="js/hades2-game-data.js"></script>
   <script defer src="js/editor-data.js"></script>
+  <script defer src="js/field-logic.js"></script>
+  <script defer src="js/cheat-limits.js"></script>
   <script defer src="js/file-access.js"></script>
   <script defer src="js/editor-search.js"></script>
   <script defer src="js/main.js"></script>
@@ -179,10 +182,13 @@
         </button>
       </header>
       <ul class="changes-dialog__list">
-        <li>Added icons.</li>
-        <li>Improved save stability.</li>
-        <li>Added File System API support.</li>
-        <li>Updated Arcana cards and keepsakes.</li>
+        <li>Opens every save version of both games, including Hades early access saves.</li>
+        <li>Hades II: warns you before an edit that the game would mark as cheating.</li>
+        <li>Hades: Hell Mode now works. Removed the God Mode and Hell Mode switches that had no effect in the game.</li>
+        <li>Hades II: added weapons, aspect ranks, tools, familiars, vows, all Cauldron incantations, achievements, rank badges and Grasp limit.</li>
+        <li>Added an Advanced tab to browse and edit any value in the save.</li>
+        <li>Fixed Greatest Gift of Gaia and the hidden aspects, which didn't fully unlock.</li>
+        <li>Fixed the Grasp cost shown for Divinity and Judgment.</li>
       </ul>
       <p class="changes-dialog__feedback">
         Don't like the changes? Feedback:
@@ -234,6 +240,25 @@
             </div>
           </dl>
         </section>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="cheat-dialog" class="changes-dialog cheat-dialog" aria-labelledby="cheat-dialog-title"
+    aria-describedby="cheat-dialog-text">
+    <div class="changes-dialog__panel">
+      <header class="changes-dialog__header">
+        <h2 id="cheat-dialog-title">Past the game's cheat check</h2>
+      </header>
+      <p id="cheat-dialog-text">
+        Hades II checks these values every time it saves. If one is past its limit, the game marks the
+        save as cheated. The mark stays on every later save of this profile, even if you lower the value
+        again.
+      </p>
+      <ul id="cheat-dialog-list" class="cheat-dialog__list"></ul>
+      <div class="cheat-dialog__actions">
+        <button id="cheat-dialog-confirm" class="button button--quiet" type="button">Keep the value</button>
+        <button id="cheat-dialog-cancel" class="button button--primary" type="button">Undo the change</button>
       </div>
     </div>
   </dialog>

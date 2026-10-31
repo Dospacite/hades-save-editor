@@ -20,6 +20,7 @@ function loadBrowserScripts(files, initial = {}) {
 }
 
 const uiContext = loadBrowserScripts([
+  "public/js/hades2-game-data.js",
   "public/js/editor-data.js",
   "public/js/editor-search.js",
   "public/js/file-access.js",
@@ -45,6 +46,13 @@ test("category labels match every field and an active matching category is retai
 
   const giftResults = search.searchSections(catalog.hades2, "gift");
   assert.equal(search.chooseSectionId(giftResults, "gifts"), "gifts");
+});
+
+test("the Advanced tab stays selected without a search, even with no listed keys", () => {
+  const results = search.searchSections(catalog.hades, "");
+  assert.equal(search.chooseSectionId(results, "advanced", ""), "advanced");
+  const matches = search.searchSections(catalog.hades, "hellfish");
+  assert.equal(search.chooseSectionId(matches, "advanced", "hellfish"), "fish");
 });
 
 test("save selection ignores unrelated files and prefers the newest active-run save", () => {
@@ -157,7 +165,7 @@ test("Arcana follows the current board and exposes rank and unlock data only", (
   );
   assert.ok(arcana.fields.every((field) => field.type === "arcana"));
   assert.ok(arcana.fields.every((field) => !field.path.includes("Equipped")));
-  assert.equal(arcana.fields.map((field) => field.grasp).join(","), "1,1,2,3,0,2,2,1,5,2,1,4,0,5,3,3,5,3,5,0,0,4,4,1,1");
+  assert.equal(arcana.fields.map((field) => field.grasp).join(","), "1,1,2,3,0,2,2,1,5,2,1,4,0,5,3,3,5,3,5,0,0,4,4,0,0");
 });
 
 test("keepsakes omit their redundant chamber suffix", () => {

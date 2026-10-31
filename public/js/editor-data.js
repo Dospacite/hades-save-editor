@@ -1,7 +1,10 @@
 (function attachEditorCatalog(global) {
   "use strict";
 
-  // Audited against the installed game Lua and English SJSON data on 2026-08-03.
+  // Hades II lists come from hades2-game-data.js, which
+  // `npm run update-game-data` generates from the installed game.
+  const GAME = global.HadesGameData?.hades2;
+  if (!GAME) throw new Error("Load hades2-game-data.js before editor-data.js.");
 
   const SAVE = "save_data.luabin.0";
   const STATE = `${SAVE}.GameState`;
@@ -92,102 +95,146 @@
     ["Zeus", "ZeusUpgrade"],
   ].map(([label, key]) => numberField(label, `${STATE}.Gift.${key}.Value`));
 
-  // Current 5x5 board order, art, and Grasp costs from MetaUpgradeData.lua.
-  const arcana = [
-    ["The Sorceress", "ChanneledCast", "01", 1],
-    ["The Wayward Son", "HealthRegen", "02", 1],
-    ["The Huntress", "LowManaDamageBonus", "03", 2],
-    ["Eternity", "CastCount", "12", 3],
-    ["The Moon", "SorceryRegenUpgrade", "05", 0],
-    ["The Furies", "CastBuff", "06", 2],
-    ["Persistence", "BonusHealth", "07", 2],
-    ["The Messenger", "BonusDodge", "08", 1],
-    ["The Unseen", "ManaOverTime", "09", 5],
-    ["Night", "MagicCrit", "04", 2],
-    ["The Swift Runner", "SprintShield", "11", 1],
-    ["Death", "LastStand", "10", 4],
-    ["The Centaur", "MaxHealthPerRoom", "13", 0],
-    ["Origination", "StatusVulnerability", "14", 5],
-    ["The Lovers", "ChanneledBlock", "15", 3],
-    ["The Enchantress", "DoorReroll", "21", 3],
-    ["The Boatman", "StartingGold", "17", 5],
-    ["The Artificer", "MetaToRunUpgrade", "18", 3],
-    ["Excellence", "RarityBoost", "19", 5],
-    ["The Queen", "BonusRarity", "20", 0],
-    ["The Fates", "TradeOff", "16", 0],
-    ["The Champions", "ScreenReroll", "22", 4],
-    ["Strength", "LowHealthBonus", "23", 4],
-    ["Divinity", "EpicRarityBoost", "24", 1],
-    ["Judgment", "CardDraw", "25", 1],
-  ].map(([label, key, image, grasp], index) => ({
+  const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+
+  // 5x5 board order, art and Grasp costs from MetaUpgradeData.lua.
+  const arcana = GAME.arcana.map((card, index) => ({
     type: "arcana",
-    label,
-    path: `${STATE}.MetaUpgradeState.${key}`,
-    icon: arcanaIcon(image),
-    grasp,
+    label: card.name,
+    path: `${STATE}.MetaUpgradeState.${card.key}`,
+    icon: arcanaIcon(card.image),
+    grasp: card.grasp,
     position: index + 1,
-    search: `rank unlocked ${key}`,
+    search: `rank unlocked ${card.key}`,
   }));
 
-  const keepsake = (label, key, textLine) => numberField(
-    label,
-    `${STATE}.KeepsakeChambers.${key}`,
+  // Keepsake rack order. Setting a level also marks the keepsake as received.
+  const keepsakes = GAME.keepsakes.map((item) => numberField(
+    item.name,
+    `${STATE}.KeepsakeChambers.${item.key}`,
     {
-      icon: keepsakeIcon(key),
+      ...(item.icon ? { icon: keepsakeIcon(item.key) } : {}),
       effects: [
-        { path: `${STATE}.GiftPresentation.${key}`, value: true, when: "truthy" },
-        { path: `${STATE}.TextLinesRecord.${textLine}`, value: true, when: "truthy" },
+        { path: `${STATE}.GiftPresentation.${item.key}`, value: true, when: "truthy" },
+        ...(item.textLine
+          ? [{ path: `${STATE}.TextLinesRecord.${item.textLine}`, value: true, when: "truthy" }]
+          : []),
       ],
     },
-  );
+  ));
 
-  const keepsakes = [
-    keepsake("Silver Wheel", "ManaOverTimeRefundKeepsake", "HecateGift01"),
-    keepsake("Knuckle Bones", "BossPreDamageKeepsake", "OdysseusGift01"),
-    keepsake("Luckier Tooth", "ReincarnationKeepsake", "SkellyGift01"),
-    keepsake("Ghost Onion", "DoorHealReserveKeepsake", "DoraGift01"),
-    keepsake("Evil Eye", "DeathVengeanceKeepsake", "NemesisGift01"),
-    keepsake("Gold Purse", "BonusMoneyKeepsake", "CharonGift01"),
-    keepsake("Engraved Pin", "BlockDeathKeepsake", "MorosGift01"),
-    keepsake("Discordant Bell", "EscalatingKeepsake", "ErisGift01"),
-    keepsake("Metallic Droplet", "TimedBuffKeepsake", "HermesGift01"),
-    keepsake("White Antler", "LowHealthCritKeepsake", "ArtemisGift01"),
-    keepsake("Moon Beam", "SpellTalentKeepsake", "SeleneGift01"),
-    keepsake("Cloud Bangle", "ForceZeusBoonKeepsake", "ZeusGift01"),
-    keepsake("Iridescent Fan", "ForceHeraBoonKeepsake", "HeraGift01"),
-    keepsake("Vivid Sea", "ForcePoseidonBoonKeepsake", "PoseidonGift01"),
-    keepsake("Barley Sheaf", "ForceDemeterBoonKeepsake", "DemeterGift01"),
-    keepsake("Harmonic Photon", "ForceApolloBoonKeepsake", "ApolloGift01"),
-    keepsake("Beautiful Mirror", "ForceAphroditeBoonKeepsake", "AphroditeGift01"),
-    keepsake("Adamant Shard", "ForceHephaestusBoonKeepsake", "HephaestusGift01"),
-    keepsake("Everlasting Ember", "ForceHestiaBoonKeepsake", "HestiaGift01"),
-    keepsake("Sword Hilt", "ForceAresBoonKeepsake", "AresGift01"),
-    keepsake("Gorgon Amulet", "AthenaEncounterKeepsake", "AthenaGift01"),
-    keepsake("Fig Leaf", "SkipEncounterKeepsake", "DionysusGift01"),
-    keepsake("Silken Sash", "ArmorGainKeepsake", "ArachneGift01"),
-    keepsake("Aromatic Phial", "FountainRarityKeepsake", "NarcissusGift01"),
-    keepsake("Concave Stone", "UnpickedBoonKeepsake", "EchoGift01"),
-    keepsake("Lion Fang", "DecayingBoostKeepsake", "HeraclesGift01"),
-    keepsake("Blackened Fleece", "DamagedDamageBoostKeepsake", "MedeaGift01"),
-    keepsake("Crystal Figurine", "BossMetaUpgradeKeepsake", "CirceGift01"),
-    keepsake("Experimental Hammer", "TempHammerKeepsake", "IcarusGift01"),
-    keepsake("Jeweled Pom", "HadesAndPersephoneKeepsake", "HadesWithPersephoneGift01"),
-    keepsake("Calling Card", "RarifyKeepsake", "ZagreusBossGrantsKeepsakeOutro01"),
-    keepsake("Time Piece", "GoldifyKeepsake", "NeoChronosGift01"),
-    keepsake("Transcendent Embryo", "RandomBlessingKeepsake", "ChaosGift01"),
+  // A "level" field picks one of several options. With `levels`, level N
+  // means the paths of levels 1..N exist and the rest are removed, the way
+  // the game stores aspect ranks and familiar upgrades. With `path`, the
+  // option value is written as a number.
+  const levelField = (label, options, settings) => ({ type: "level", label, options, ...settings });
+  const rankOptions = (count, zeroLabel) => [
+    { value: 0, label: zeroLabel },
+    ...Array.from({ length: count }, (_, index) => ({ value: index + 1, label: ROMAN[index] })),
   ];
 
-  const hiddenAspect = (label, key, textLine) => toggleField(
-    label,
-    `${STATE}.WeaponsUnlocked.${key}`,
-    {
-      effects: [{
-        path: `${STATE}.TextLinesRecord.${textLine}`,
-        value: true,
-        when: "truthy",
-      }],
-    },
+  // What the Silver Pool writes for a purchase.
+  const owned = (key) => [`${STATE}.WeaponsUnlocked.${key}`, `${STATE}.WorldUpgradesAdded.${key}`];
+
+  const weapons = GAME.weapons.flatMap((weapon) => [
+    toggleField(weapon.name, `${STATE}.WeaponsUnlocked.${weapon.key}`, {
+      group: weapon.name,
+      description: "Weapon unlocked",
+      removeWhenOff: true,
+      search: "weapon unlocked",
+      effects: [{ path: `${STATE}.WorldUpgradesAdded.${weapon.key}`, mirror: true }],
+    }),
+    ...weapon.aspects.map((aspect) => levelField(aspect.name, rankOptions(aspect.ranks.length + 1, "Locked"), {
+      group: weapon.name,
+      levels: [owned(aspect.key), ...aspect.ranks.map(owned)],
+      tag: aspect.hidden ? "Hidden aspect" : undefined,
+      search: `aspect rank ${aspect.key}`,
+      effects: aspect.textLine
+        ? [{ path: `${STATE}.TextLinesRecord.${aspect.textLine}`, value: true, when: "truthy" }]
+        : [],
+    })),
+  ]);
+
+  const tools = GAME.tools.map((tool) => levelField(tool.name, [
+    { value: 0, label: "Locked" },
+    { value: 1, label: "Owned" },
+    ...tool.upgrades.map((upgrade, index) => ({ value: index + 2, label: "Upgraded" })),
+  ], {
+    group: "Gathering tools",
+    levels: [owned(tool.key), ...tool.upgrades.map((upgrade) => owned(upgrade.key))],
+    search: `tool ${tool.key}`,
+  }));
+
+  const familiars = GAME.familiars.flatMap((familiar) => [
+    toggleField(familiar.name, `${STATE}.FamiliarsUnlocked.${familiar.key}`, {
+      group: familiar.name,
+      description: "Recruited",
+      removeWhenOff: true,
+      search: "familiar recruited",
+    }),
+    ...familiar.tracks.map((track) => levelField(track.name, rankOptions(track.ranks.length, "None"), {
+      group: familiar.name,
+      levels: track.ranks.map((key) => [`${STATE}.FamiliarUpgrades.${key}`]),
+      search: `${familiar.name} familiar upgrade`,
+    })),
+  ]);
+
+  const vows = GAME.vows.map((vow) => levelField(vow.name, rankOptions(vow.points.length, "Off"), {
+    group: "Vows",
+    path: `${STATE}.ShrineUpgrades.${vow.key}`,
+    fallback: 0,
+    points: vow.points,
+    search: `vow fear ${vow.key}`,
+  }));
+
+  // Group order follows the Cauldron.
+  const incantationGroups = [...new Set(GAME.incantations.map((item) => item.group))];
+  const incantations = incantationGroups.flatMap((group) => GAME.incantations
+    .filter((item) => item.group === group)
+    .map((item) => toggleField(item.name, `${STATE}.WorldUpgradesAdded.${item.key}`, {
+      group,
+      description: item.description,
+      removeWhenOff: true,
+      search: item.key,
+      // The Cauldron sets all four tables.
+      effects: [
+        { path: `${STATE}.WorldUpgrades.${item.key}`, mirror: true },
+        { path: `${STATE}.WorldUpgradesViewed.${item.key}`, value: true, when: "truthy" },
+        { path: `${STATE}.WorldUpgradesRevealed.${item.key}`, value: true, when: "truthy" },
+      ],
+    })));
+
+  // The game has no English names for these; Steam does. Derived from the key.
+  const achievementLabel = (key) => key
+    .replace(/^Ach/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Za-z])(\d)/g, "$1 $2");
+  const achievements = GAME.achievements.map((key) => toggleField(
+    achievementLabel(key),
+    `${STATE}.AchievementsUnlocked.${key}`,
+    { removeWhenOff: true, search: key },
+  ));
+
+  const graspLimit = levelField(
+    "Grasp limit",
+    GAME.graspLimits.map((grasp, level) => ({ value: level, label: `${grasp} Grasp` })),
+    { path: `${STATE}.MetaUpgradeLimitLevel`, fallback: 0, search: "grasp limit altar of ashes" },
   );
+
+  const badgeRank = levelField(
+    "Rank badge",
+    [{ value: 0, label: "None" }, ...GAME.badges.map((name, index) => ({ value: index + 1, label: name }))],
+    { path: `${STATE}.BadgeRank`, fallback: 0, search: "badge rank broker kudos" },
+  );
+
+  // Advanced view entries. Search finds a key by name or by its note.
+  const advanced = Object.entries(GAME.notes.GameState).map(([key, note]) => ({
+    type: "explore",
+    label: key,
+    path: `${STATE}.${key}`,
+    note,
+    search: note,
+  }));
 
   const catalog = {
     hades: {
@@ -196,9 +243,15 @@
         {
           id: "general",
           label: "General",
+          // God Mode on/off is a game setting, not save data. The save only
+          // keeps its strength. Hell Mode is GameState.Flags.HardMode.
           fields: [
-            toggleField("God Mode", "save_data.god_mode_enabled", { storedAsByte: true }),
-            toggleField("Hell Mode", "save_data.hell_mode_enabled", { storedAsByte: true }),
+            numberField("God Mode level", `${STATE}.EasyModeLevel`),
+            toggleField("Hell Mode", `${STATE}.Flags.HardMode`, {
+              removeWhenOff: true,
+              description: "Turns Hell Mode on for this save. It does not add the Pact conditions a new Hell Mode save starts with.",
+              search: "hard mode",
+            }),
             objectField("Random seeds", `${SAVE}.NextSeeds`),
           ],
         },
@@ -217,6 +270,14 @@
         },
         { id: "fish", label: "Fish", fields: hadesFish },
         { id: "relationships", label: "Relationships", fields: hadesRelationships },
+        {
+          id: "advanced",
+          label: "Advanced",
+          layout: "explorer",
+          tone: "warning",
+          description: "Every value in the save. Change these only if you know what they do.",
+          fields: [],
+        },
       ],
     },
 
@@ -227,9 +288,11 @@
           id: "general",
           label: "General",
           fields: [
+            // Turning God Mode on or off is a game setting, not save data.
             numberField("God Mode level", `${STATE}.EasyModeLevel`, { max: 30 }),
-            toggleField("God Mode", "save_data.god_mode_enabled", { storedAsByte: true }),
-            toggleField("Hell Mode", "save_data.hell_mode_enabled", { storedAsByte: true }),
+            badgeRank,
+            numberField("Next run seed", `${STATE}.NextRunSeed`, { min: undefined }),
+            objectField("Random seeds", `${SAVE}.NextSeeds`),
           ],
         },
         {
@@ -363,30 +426,76 @@
             numberField("Death Defiances used", `${SAVE}.CurrentRun.Hero.LastStandsUsed`),
             numberField("Max Death Defiances", `${SAVE}.CurrentRun.Hero.MaxLastStands`),
             numberField("Fates", `${SAVE}.CurrentRun.NumRerolls`),
+            numberField("Gold Crowns", `${RESOURCES}.Money`, { search: "gold money" }),
           ],
         },
-        { id: "arcana", label: "Arcana", layout: "arcana", fields: arcana },
+        {
+          id: "arcana",
+          label: "Arcana",
+          layout: "arcana",
+          toolbar: [graspLimit],
+          summary: "grasp",
+          fields: arcana,
+        },
         { id: "keepsakes", label: "Keepsakes", fields: keepsakes },
         {
-          id: "unlocks",
-          label: "Unlocks",
+          id: "weapons",
+          label: "Weapons",
+          description: "Ranks match the Silver Pool. Lowering a rank removes the higher ranks from the save. Hidden aspects also mark their unlock conversation as seen.",
+          fields: [...weapons, ...tools],
+        },
+        { id: "familiars", label: "Familiars", fields: familiars },
+        {
+          id: "oath",
+          label: "Oath",
+          summary: "fear",
+          description: "Vow ranks set the Fear for your next night. Vow of Rivals needs the matching Rivals incantations for ranks II to IV.",
           fields: [
-            toggleField("Oath of the Unseen", `${STATE}.TextLinesRecord.HecateGrantsShrineUpgrade01`),
-            toggleField("Rivals of Depth and Sea", `${STATE}.WorldUpgradesAdded.WorldUpgradeBossDifficultyT2`),
-            toggleField("Rivals of Plain and Peak", `${STATE}.WorldUpgradesAdded.WorldUpgradeBossDifficultyT3`),
-            toggleField("Rivals of Old and Rot", `${STATE}.WorldUpgradesAdded.WorldUpgradeBossDifficultyT4`),
-            toggleField("Greatest Gift of Gaia", `${STATE}.WorldUpgradesAdded.WorldUpgradeAutoHarvestOnExit`),
-            hiddenAspect("Aspect of Anubis — Staff", "StaffRaiseDeadAspect", "CirceGrantsHiddenAspect01"),
-            hiddenAspect("Aspect of the Morrigan — Blades", "DaggerTripleAspect", "ArtemisGrantsHiddenAspect01"),
-            hiddenAspect("Aspect of Supay — Torches", "TorchAutofireAspect", "MorosGrantsHiddenAspect01"),
-            hiddenAspect("Aspect of Nergal — Axe", "AxeRallyAspect", "CharonGrantsHiddenAspect01"),
-            hiddenAspect("Aspect of Hel — Skull", "LobGunAspect", "MedeaGrantsHiddenAspect01"),
-            hiddenAspect("Aspect of Shiva — Coat", "SuitComboAspect", "SeleneGrantsHiddenAspect01"),
+            toggleField("Oath of the Unseen", `${STATE}.TextLinesRecord.HecateGrantsShrineUpgrade01`, {
+              group: "Oath",
+              description: "Unlocks the Oath at the Crossroads.",
+              search: "shrine",
+            }),
+            ...vows,
           ],
+        },
+        {
+          id: "incantations",
+          label: "Incantations",
+          description: "Each one is marked as bought, seen and revealed, the same as the Cauldron does. Story incantations skip ahead in the story, so you may miss scenes.",
+          fields: incantations,
+        },
+        {
+          id: "achievements",
+          label: "Achievements",
+          tone: "warning",
+          description: "The game sends every achievement marked here to Steam or your platform the next time it checks. Platform achievements can't be removed again from the save.",
+          fields: achievements,
+        },
+        {
+          id: "advanced",
+          label: "Advanced",
+          layout: "explorer",
+          tone: "warning",
+          description: "Every value in the save, including records the game keeps for itself. Most of these are rebuilt or checked by the game, so change them only if you know what they do.",
+          notes: GAME.notes,
+          fields: advanced,
         },
       ],
     },
   };
+
+  // Resources added by a game patch show up even before someone sorts them.
+  const listedPaths = new Set(catalog.hades2.sections.flatMap((section) => section.fields.map((field) => field.path)));
+  const newResources = GAME.resources.filter((item) => !listedPaths.has(`${RESOURCES}.${item.key}`));
+  if (newResources.length) {
+    catalog.hades2.sections.find((section) => section.id === "resources").fields.push(
+      ...newResources.map((item) => numberField(item.name, `${RESOURCES}.${item.key}`, {
+        group: "Other",
+        ...(item.icon ? { icon: itemIcon("hades2", item.key) } : {}),
+      })),
+    );
+  }
 
   global.HadesEditorCatalog = Object.freeze(catalog);
 })(typeof globalThis !== "undefined" ? globalThis : window);

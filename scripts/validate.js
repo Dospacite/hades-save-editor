@@ -9,7 +9,10 @@ const projectRoot = resolve(__dirname, "..");
 const publicRoot = resolve(projectRoot, "public");
 const scripts = [
   "js/save-codec.js",
+  "js/hades2-game-data.js",
   "js/editor-data.js",
+  "js/field-logic.js",
+  "js/cheat-limits.js",
   "js/file-access.js",
   "js/editor-search.js",
   "js/main.js",
@@ -32,13 +35,12 @@ const localAssets = Array.from(html.matchAll(/(?:src|href)="(?!https?:|mailto:|\
 const catalogContext = { globalThis: null };
 catalogContext.globalThis = catalogContext;
 vm.createContext(catalogContext);
-vm.runInContext(
-  readFileSync(resolve(publicRoot, "js/editor-data.js"), "utf8"),
-  catalogContext,
-);
+for (const script of ["js/hades2-game-data.js", "js/editor-data.js"]) {
+  vm.runInContext(readFileSync(resolve(publicRoot, script), "utf8"), catalogContext);
+}
 const iconAssets = Object.values(catalogContext.HadesEditorCatalog)
   .flatMap((game) => game.sections)
-  .flatMap((section) => section.fields)
+  .flatMap((section) => [...section.fields, ...(section.toolbar || [])])
   .map((field) => field.icon)
   .filter(Boolean);
 
